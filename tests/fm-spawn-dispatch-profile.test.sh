@@ -128,6 +128,43 @@ test_no_profile_keeps_claude_profile_defaults() {
   pass "no --model/--effort records defaults and types the claude launch instructions"
 }
 
+# The recorded launch= line is the only durable record of how a task was
+# actually started, and both restart-recovery scripts stand on it:
+# bin/fm-crew-relaunch.sh replays it byte-for-byte, and bin/fm-crew-fitness.sh
+# reads it to learn which autonomy grant THIS task is supposed to be running
+# with. Recording anything other than the exact string that was typed into the
+# pane would relaunch a task differently than it was launched, or make fitness
+# assert a flag the task never had - so the record is pinned against the literal
+# command the fake pane captured, not against a re-derived expectation.
+test_meta_records_the_exact_launch_command_that_was_typed() {
+  local rec id out status launch meta recorded lines
+  id=profile-launch-record-z20
+  rec=$(make_spawn_case profile-launch-record claude "$id")
+  read_case_record "$rec"
+
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opus --effort xhigh)
+  status=$?
+  expect_code 0 "$status" "claude spawn should succeed"
+  meta="$HOME_DIR/state/$id.meta"
+  assert_grep 'launch=' "$meta" "spawn recorded no launch= line, so a deterministic relaunch is impossible"
+
+  launch=$(cat "$LAUNCH_LOG")
+  recorded=$(sed -n 's/^launch=//p' "$meta")
+  [ "$recorded" = "$launch" ] || fail "recorded launch= is not the command that was typed into the pane"$'\n'"typed:    $launch"$'\n'"recorded: $recorded"
+
+  # Exactly one line: fm_meta_get reads a key with tail -1, so a launch value
+  # that spilled onto a second line would let a later line masquerade as
+  # another key for every consumer, teardown included.
+  lines=$(grep -c '^launch=' "$meta")
+  [ "$lines" -eq 1 ] || fail "expected exactly one launch= line in $meta, found $lines"
+
+  # The grant fitness enforces has to be in the record, or the check has
+  # nothing to compare the live process against.
+  assert_contains "$recorded" '--dangerously-skip-permissions' \
+    "the recorded launch command lost the autonomy grant fm-crew-fitness.sh reads from it"
+  pass "spawn records the exact resolved launch command as a single launch= line"
+}
+
 test_relative_home_overrides_launch_with_absolute_cross_process_paths() {
   local rec id out status launch home_real
   id=profile-relative-paths-z1b
@@ -668,6 +705,7 @@ test_active_dispatch_profile_does_not_block_secondmate_launch() {
 }
 
 test_no_profile_keeps_claude_profile_defaults
+test_meta_records_the_exact_launch_command_that_was_typed
 test_relative_home_overrides_launch_with_absolute_cross_process_paths
 test_home_defaults_preserve_absolute_or_resolve_relative_paths
 test_absolute_override_spelling_is_preserved_in_launch_paths

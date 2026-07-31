@@ -81,6 +81,7 @@ Ambiguous pending text never receives the busy-queue conversion.
 
 - tmux is the reference path and supports secondmate homes.
 - The OpenCode busy-queue exception is tmux-specific; Herdr retains its separately documented gap.
+- The crewmate-fitness argv and environment reads resolve a pane's foreground processes through `/proc`, so on a host without a readable one - macOS, or a `hidepid=2` mount - `bin/fm-crew-fitness.sh` reports its autonomy axis `unknown` rather than guessing, and only its recorded-worktree axis can still condemn a pane there; [`verification/runtime-backends.md`](verification/runtime-backends.md#foreground-argv-and-environment) owns the evidence and boundary.
 
 ```sh
 tests/fm-backend-tmux-smoke.test.sh

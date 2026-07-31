@@ -66,6 +66,7 @@ Escalate in order:
 3. If the crewmate is confused or looping, interrupt with the adapter's interrupt key, then redirect with one corrective line.
    For example, for a single-Escape adapter: `FM_HOME=<this-firstmate-home> bin/fm-send.sh <window> --key Escape`.
 4. If the crewmate is genuinely wedged after redirection, exit the agent with the adapter's exit command and relaunch with the same brief plus a `progress so far` note appended to it.
+   Use `bin/fm-crew-relaunch.sh <id> --note '<progress so far>'` for that relaunch whenever the task recorded a `launch=` command: it replays the resolved launch in the recorded worktree and appends the note itself, so nothing has to be reassembled by hand.
    Genuine wedging means looping, unresponsive, repeating the same obstacle, or truly dead.
    A low context reading is not wedging; modern harnesses auto-compact and keep going.
    The worktree and commits persist, so relaunch is cheap.
