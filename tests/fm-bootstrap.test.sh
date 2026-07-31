@@ -6,8 +6,9 @@
 # all is well. firstmate consumes the exact 'MISSING: treehouse (install: ...)',
 # 'MISSING: tasks-axi (install: ...)', 'MISSING: quota-axi (install: ...)', and
 # 'BOOTSTRAP_INFO: ...' lines, so those contracts are pinned verbatim. The cases
-# are table-driven over the inputs that vary: whether `treehouse get --help`
-# advertises --lease, which (if any) tasks-axi version is on PATH, whether
+# are table-driven over the inputs that vary: Treehouse version and whether
+# `treehouse get --help` advertises --lease, which (if any) tasks-axi version is
+# on PATH, whether
 # tasks-axi update advertises --archive-body, whether its mv help advertises
 # multi-ID moves, whether quota-axi is on PATH,
 # whether the local backend config opts out of tasks-axi backlog mutations, and
@@ -34,7 +35,8 @@ unset TMUX TMUX_PANE HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH \
   CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_SOCKET_PATH CMUX_TAB_ID CMUX_PANEL_ID 2>/dev/null || true
 
 # A fake toolchain where every required tool is present and gh is authenticated.
-# treehouse's `get --help` advertises --lease only when FM_FAKE_TREEHOUSE_LEASE_HELP=1.
+# Treehouse defaults to the minimum compatible v2.0.1, and its `get --help`
+# advertises --lease only when FM_FAKE_TREEHOUSE_LEASE_HELP=1.
 make_fake_toolchain() {
   local dir=$1 fakebin
   fakebin=$(fm_fakebin "$dir")
@@ -49,6 +51,10 @@ SH
   chmod +x "$fakebin/gh"
   cat > "$fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  printf '%s\n' "${FM_FAKE_TREEHOUSE_VERSION:-v2.0.1}"
+  exit 0
+fi
 if [ "${1:-}" = get ] && [ "${2:-}" = --help ]; then
   if [ "${FM_FAKE_TREEHOUSE_LEASE_HELP:-}" = 1 ]; then
     printf '%s\n' 'Usage: treehouse get [--lease] [--lease-holder <holder>]'
@@ -281,7 +287,7 @@ test_bootstrap_reporting() {
         ;;
     esac
   done <<'ROWS'
-treehouse --lease support is accepted silently^1^0.1.1^1^manual^empty^^
+minimum compatible treehouse is accepted silently^1^0.1.1^1^manual^empty^^
 treehouse without --lease reports an upgrade, gh auth is fine^0^0.1.1^1^-^grep^MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)^NEEDS_GH_AUTH
 compatible tasks-axi is silent by default^1^0.1.1^1^-^empty^^
 missing tasks-axi is required by default^1^-^1^-^exact^MISSING: tasks-axi (install: npm install -g tasks-axi)^
@@ -292,7 +298,76 @@ missing quota-axi is required by default^1^0.1.1^0^manual^exact^MISSING: quota-a
 manual backlog backend still requires missing tasks-axi^1^-^1^manual^exact^MISSING: tasks-axi (install: npm install -g tasks-axi)^
 manual backlog backend suppresses tasks-axi availability^1^0.1.1^1^manual^empty^^
 ROWS
-  pass "bootstrap reports treehouse lease + tasks-axi/quota-axi bootstrap contracts"
+  pass "bootstrap reports treehouse compatibility + tasks-axi/quota-axi bootstrap contracts"
+}
+
+test_treehouse_min_version() {
+  local label version lease backend mode case_dir fakebin out missing n
+  missing='MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)'
+  n=0
+  while IFS='^' read -r label version lease backend mode; do
+    [ -n "$label" ] || continue
+    n=$((n + 1))
+    case_dir="$TMP_ROOT/treehouse-version-$n"
+    mkdir -p "$case_dir/home/config"
+    printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+    if [ "$backend" != "-" ]; then
+      printf '%s\n' "$backend" > "$case_dir/home/config/backend"
+    fi
+    fakebin=$(make_fake_toolchain "$case_dir")
+    if [ "$backend" = orca ]; then
+      fm_fake_exit0 "$fakebin" orca
+    fi
+    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+      FM_FAKE_TREEHOUSE_VERSION="$version" FM_FAKE_TREEHOUSE_LEASE_HELP="$lease" \
+      "$ROOT/bin/fm-bootstrap.sh")
+    case "$mode" in
+      empty)
+        [ -z "$out" ] || fail "$label: expected silence, got: $out" ;;
+      missing)
+        [ "$out" = "$missing" ] || fail "$label: expected '$missing', got: $out" ;;
+    esac
+  done <<'ROWS'
+minimum Treehouse version is accepted^v2.0.1^1^-^empty
+newer Treehouse patch is accepted^2.0.2^1^-^empty
+newer Treehouse minor is accepted^v2.1.0^1^-^empty
+newer Treehouse major is accepted^v3.0.0^1^-^empty
+Treehouse v2.0.0 reports an upgrade^v2.0.0^1^-^missing
+older Treehouse major reports an upgrade^v1.99.99^1^-^missing
+unparseable Treehouse version reports an upgrade^treehouse development build^1^-^missing
+prerelease at the version floor reports an upgrade^v2.0.1-rc.1^1^-^missing
+compatible Treehouse without lease support reports an upgrade^v2.1.0^0^-^missing
+old Treehouse without lease support reports one upgrade^v2.0.0^0^-^missing
+Orca ignores an incompatible unused Treehouse^treehouse development build^0^orca^empty
+ROWS
+  pass "bootstrap enforces the Treehouse 2.0.1 minimum and lease support"
+}
+
+test_treehouse_rejects_extra_version_output() {
+  local label mode version case_dir fakebin out missing n
+  missing='MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)'
+  n=0
+  while IFS='^' read -r label mode; do
+    [ -n "$label" ] || continue
+    n=$((n + 1))
+    case "$mode" in
+      diagnostic) version=$'v2.0.1\nunexpected diagnostic line' ;;
+      blank) version=$'v2.0.1\n' ;;
+    esac
+    case_dir="$TMP_ROOT/treehouse-extra-version-output-$n"
+    mkdir -p "$case_dir/home/config"
+    printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+    fakebin=$(make_fake_toolchain "$case_dir")
+    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+      FM_FAKE_TREEHOUSE_VERSION="$version" FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+      "$ROOT/bin/fm-bootstrap.sh")
+    [ "$out" = "$missing" ] \
+      || fail "$label: expected '$missing', got: $out"
+  done <<'ROWS'
+diagnostic line after Treehouse version^diagnostic
+blank line after Treehouse version^blank
+ROWS
+  pass "bootstrap rejects extra Treehouse version output"
 }
 
 test_no_mistakes_min_version() {
@@ -833,6 +908,8 @@ ROWS
 }
 
 test_bootstrap_reporting
+test_treehouse_min_version
+test_treehouse_rejects_extra_version_output
 test_no_mistakes_min_version
 test_quota_axi_min_version
 test_git_is_required_with_supported_install_instruction

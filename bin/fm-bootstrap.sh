@@ -45,8 +45,11 @@
 #          A TANGLE line means the firstmate primary checkout (FM_ROOT) is stranded
 #          on a feature branch instead of its default branch - a crewmate's work
 #          landed in the primary instead of its own worktree; restore it per the line.
-#          treehouse is also MISSING when its installed version lacks
-#          "treehouse get --lease" support.
+#          treehouse is also MISSING when its installed version is older than
+#          2.0.1, does not print exactly one bare version line, or lacks
+#          "treehouse get --lease" support. Version 2.0.1 is the minimum safe
+#          release because it adds atomic state persistence and conservative
+#          corrupt-state recovery.
 #          no-mistakes is also MISSING when its installed version is older than
 #          1.31.2.
 #          tasks-axi and quota-axi are required bootstrap tools (same class as
@@ -535,6 +538,7 @@ if ! BACKEND_TOOLS=$(fm_backend_required_tools "$BACKEND"); then
   BACKEND_TOOLS=""
 fi
 TOOLS="$BACKEND_TOOLS $COMMON_TOOLS"
+TREEHOUSE_MIN=2.0.1
 NO_MISTAKES_MIN=1.31.2
 
 treehouse_supports_lease() {
@@ -545,12 +549,36 @@ treehouse_supports_lease() {
 # cannot be parsed into exactly one major.minor.patch triple is incompatible,
 # never assumed current, so a development or vendored build cannot pass a floor
 # it was never checked against.
-tool_version_at_least() {  # <tool> <min-version>
-  local tool=$1 min=$2 output parts major minor patch extra
+# The optional third argument tightens that further: `exact-line` requires the
+# whole `--version` output to be one bare version line, so surrounding text, an
+# extra diagnostic line, or a trailing blank line is incompatible rather than
+# silently parsed for the first triple it happens to contain.
+tool_version_at_least() {  # <tool> <min-version> [exact-line]
+  local tool=$1 min=$2 strict=${3:-} output rc parts major minor patch extra
   local min_major min_minor min_patch min_extra
   command -v "$tool" >/dev/null 2>&1 || return 1
-  output=$("$tool" --version 2>/dev/null) || return 1
-  parts=$(printf '%s\n' "$output" | sed -nE 's/.*[vV]?([0-9]+)\.([0-9]+)\.([0-9]+).*/\1 \2 \3/p' | head -n 1)
+  if [ "$strict" = exact-line ]; then
+    # Command substitution strips every trailing newline, so a sentinel byte
+    # preserves them long enough to reject output that carries an extra line.
+    output=$(
+      "$tool" --version 2>/dev/null
+      rc=$?
+      printf '\034'
+      exit "$rc"
+    ) || return 1
+    case "$output" in
+      *$'\034') output=${output%$'\034'} ;;
+      *) return 1 ;;
+    esac
+    output=${output%$'\n'}
+    case "$output" in
+      *$'\n'*) return 1 ;;
+    esac
+    parts=$(printf '%s\n' "$output" | sed -nE 's/^[[:space:]]*[vV]?([0-9]+)\.([0-9]+)\.([0-9]+)[[:space:]]*$/\1 \2 \3/p')
+  else
+    output=$("$tool" --version 2>/dev/null) || return 1
+    parts=$(printf '%s\n' "$output" | sed -nE 's/.*[vV]?([0-9]+)\.([0-9]+)\.([0-9]+).*/\1 \2 \3/p' | head -n 1)
+  fi
   IFS=' ' read -r major minor patch extra <<< "$parts"
   [ -n "$major" ] && [ -n "$minor" ] && [ -n "$patch" ] && [ -z "$extra" ] || return 1
   IFS='.' read -r min_major min_minor min_patch min_extra <<< "$min"
@@ -560,6 +588,10 @@ tool_version_at_least() {  # <tool> <min-version>
   [ "$minor" -gt "$min_minor" ] && return 0
   [ "$minor" -eq "$min_minor" ] || return 1
   [ "$patch" -ge "$min_patch" ]
+}
+
+treehouse_compatible() {
+  tool_version_at_least treehouse "$TREEHOUSE_MIN" exact-line && treehouse_supports_lease
 }
 
 x_mode_write_if_changed() {
@@ -865,11 +897,11 @@ done
 for t in $COMMON_TOOLS; do
   command -v "$t" >/dev/null || missing_tool_diagnostic "$t"
 done
-# The treehouse lease-support upgrade check is only relevant when the resolved
-# backend actually requires treehouse (every backend except orca, which owns its
-# own worktrees); an orca home must not be told to upgrade a provider it never uses.
+# Treehouse compatibility is only relevant when the resolved backend requires
+# it (every backend except orca, which owns its own worktrees); an orca home must
+# not be told to upgrade a provider it never uses.
 if fm_backend_list_contains "$TOOLS" treehouse \
-  && command -v treehouse >/dev/null 2>&1 && ! treehouse_supports_lease; then
+  && command -v treehouse >/dev/null 2>&1 && ! treehouse_compatible; then
   echo "MISSING: treehouse (install: $(install_cmd treehouse))"
 fi
 if command -v no-mistakes >/dev/null 2>&1 && ! tool_version_at_least no-mistakes "$NO_MISTAKES_MIN"; then
