@@ -1890,6 +1890,33 @@ fm_backend_herdr_current_path() {  # <target>
     | jq -r '.result.pane.foreground_cwd // empty' 2>/dev/null
 }
 
+# fm_backend_herdr_pane_argv_has: 0 if any argv element of the pane's FOREGROUND
+# process group is EXACTLY <element>, 1 if it is confidently absent, 2 if the
+# answer cannot be established. See fm-backend.sh's fm_backend_pane_argv_has for
+# the shared contract.
+#
+# `pane process-info` reports `.result.process_info.foreground_processes[].argv`
+# as a real JSON array, so element boundaries survive intact and jq can compare
+# whole elements. An absent or empty foreground_processes list is an
+# undeterminable read (2), never proof of absence: a pane whose agent has not
+# been attributed yet must not be reported as having lost its autonomy flag.
+fm_backend_herdr_pane_argv_has() {  # <target> <element>
+  local target=$1 want=$2 info n
+  fm_backend_herdr_target_ready "$target" || return 2
+  info=$(fm_backend_herdr_cli "$FM_BACKEND_HERDR_SESSION" pane process-info \
+    --pane "$FM_BACKEND_HERDR_PANE" 2>/dev/null) || return 2
+  [ -n "$info" ] || return 2
+  n=$(printf '%s' "$info" \
+    | jq -r '[.result.process_info.foreground_processes[]? | select(.argv != null)] | length' 2>/dev/null)
+  case "$n" in ''|*[!0-9]*) return 2 ;; esac
+  [ "$n" -gt 0 ] || return 2
+  if printf '%s' "$info" | jq -e --arg want "$want" \
+    'any(.result.process_info.foreground_processes[]?.argv[]?; . == $want)' >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
 # fm_backend_herdr_send_text_line: send one line of TEXT then submit,
 # ATOMICALLY - mirrors tmux's `send-keys -t T text Enter`. Used for the fixed
 # spawn-time commands (treehouse get, the GOTMPDIR export). `pane run` types

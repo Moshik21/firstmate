@@ -183,6 +183,12 @@ First launch in a fresh worktree, or first ever on a machine, may show a trust o
 After every spawn, peek the pane within about 20 seconds.
 If such a dialog is showing, accept it from an active firstmate session using `FM_HOME=<this-firstmate-home> bin/fm-send.sh <window> --key Enter`, or the choice the dialog requires, unless `FM_HOME` is already set to the active firstmate home; verify the brief started processing.
 
+**Autonomy is a launch-time grant and cannot be restored from the keyboard (verified 2026-07-31, Claude Code 2.1.220).**
+`bypassPermissions` is only available to a session that was started with `--dangerously-skip-permissions`, or with `--allow-dangerously-skip-permissions`, whose own help states it "enable[s] bypassing all permission checks as an option, without it being enabled by default".
+A process started with neither does not offer that mode at all, so no interrupt, keystroke, or mode-cycle can put it back into bypass; `shift+tab` cycles only the modes the running process already has.
+This is the durable reason a restored pane cannot be repaired remotely with a keystroke, independent of whether any given session provider transmits that key.
+The only repair is to exit the agent and relaunch it with the original launch command, which is what `bin/fm-crew-relaunch.sh` replays; `stuck-crewmate-recovery` owns the procedure.
+
 Claude renders a predicted-next-prompt suggestion as dim/faint text inside an otherwise-empty composer after a turn completes.
 A plain `tmux capture-pane` cannot tell that ghost text apart from typed text.
 Firstmate launches every claude crewmate and secondmate with `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false`, scoped to firstmate-launched agents through `bin/fm-spawn.sh`, so it never touches the captain's global config.

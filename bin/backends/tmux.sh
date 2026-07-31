@@ -101,6 +101,38 @@ fm_backend_tmux_current_path() {  # <target>
   tmux display-message -p -t "$1" '#{pane_current_path}' 2>/dev/null
 }
 
+# fm_backend_tmux_pane_argv_has: 0 if any argv element of the pane's FOREGROUND
+# process group is EXACTLY <element>, 1 if it is confidently absent, 2 if the
+# answer cannot be established. See fm-backend.sh's fm_backend_pane_argv_has for
+# the shared contract and why exact-element (never substring) matching is
+# mandatory.
+#
+# tmux exposes no argv formatter, so this resolves the pane's controlling tty,
+# reads that tty's foreground process-group id, and reads the NUL-separated
+# /proc/<pid>/cmdline of every process in that group. NUL separation is what
+# makes exact-element matching possible; a space-joined `ps -o args=` fallback
+# could not tell a real flag apart from a brief that merely mentions it, so a
+# host without a readable /proc returns 2 (undeterminable) rather than guessing.
+fm_backend_tmux_pane_argv_has() {  # <target> <element>
+  local target=$1 want=$2 tty tpgid pid found=1
+  [ -r /proc/self/cmdline ] || return 2
+  tty=$(tmux display-message -p -t "$target" '#{pane_tty}' 2>/dev/null) || return 2
+  [ -n "$tty" ] || return 2
+  tpgid=$(ps -t "$tty" -o tpgid= 2>/dev/null | tr -d ' ' | grep -E '^[0-9]+$' | head -1)
+  case "$tpgid" in ''|*[!0-9]*) return 2 ;; esac
+  for pid in $(ps -t "$tty" -o pgid=,pid= 2>/dev/null | awk -v g="$tpgid" '$1 == g { print $2 }'); do
+    [ -r "/proc/$pid/cmdline" ] || continue
+    found=0
+    if tr '\0' '\n' < "/proc/$pid/cmdline" 2>/dev/null | grep -qxF -- "$want"; then
+      return 0
+    fi
+  done
+  # found stays 1 when no foreground process was readable at all: that is an
+  # undeterminable read, not proof the element is absent.
+  [ "$found" -eq 0 ] || return 2
+  return 1
+}
+
 # fm_backend_tmux_send_text_line: send one line of TEXT then Enter, with no
 # composer verification - used for the fixed spawn-time commands
 # (`treehouse get`, the GOTMPDIR export) that already ran this exact sequence

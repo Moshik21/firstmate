@@ -2,7 +2,7 @@
 name: stuck-crewmate-recovery
 description: >-
   Agent-only playbook for stuck or missing ordinary Firstmate direct reports.
-  Use when the session-start digest reports an ordinary direct report's endpoint dead or its metadata has no window, or after a stale wake, looping pane, repeated confusion, an answered-by-brief question, an unresponsive crewmate, or a failed steer.
+  Use when the session-start digest reports an ordinary direct report's endpoint dead, reports a live endpoint as unfit, or its metadata has no window, or after a stale wake, looping pane, repeated confusion, an answered-by-brief question, an unresponsive crewmate, or a failed steer.
   Reconciles recorded work before escalating from targeted inspection through safe relaunch or failure.
 user-invocable: false
 metadata:
@@ -12,9 +12,31 @@ metadata:
 # stuck-crewmate-recovery
 
 Use this playbook when the session-start digest reports an ordinary direct report's endpoint dead or its metadata has no window, or when a direct report is stale, looping, repeatedly confused, asking a question its brief already answers, unresponsive, or when a steer failed to land.
+Also use it when the digest reports a live endpoint as `fitness: unfit`.
 
 Load `harness-adapters` before sending an interrupt, exit command, resume command, or harness-specific skill invocation.
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
+
+## Alive but unable to work
+
+A live endpoint does not prove the worker can still act.
+After a session-provider restart, a pane can come back with full conversation context, no error, and a live endpoint, yet have lost the autonomy flag it was launched with and be sitting outside its task worktree.
+Such a worker stalls forever on its first tool call, waiting for an approval nobody is watching for.
+`bin/fm-crew-fitness.sh <id>` is the owner of that verdict, and the session-start digest runs it for every live endpoint.
+`bin/fm-crew-fitness.sh --all` sweeps this home when a restart is suspected mid-session.
+
+Repair an `unfit` worker in this order.
+
+1. Exit the agent with its adapter's exit command from `harness-adapters`.
+   The pane must fall back to its shell first, because the repair refuses to relaunch over a live agent.
+2. Run `bin/fm-crew-relaunch.sh <id>`, which replays the exact launch command recorded at spawn time in the task's own worktree.
+   Do not hand-assemble the relaunch: the recorded command already carries the resolved autonomy flag, model, effort, env prefixes, and encoded brief.
+3. Confirm with `bin/fm-crew-fitness.sh <id>` that the pane reads `fit` again.
+
+A refusal from that script is a stop-and-investigate result.
+It refuses when an agent still owns the task, when the recorded worktree is gone or is no longer its own checkout, or when no launch command was recorded, and it never allocates a replacement worktree.
+`unknown` is not `unfit`: it means the check could not establish an answer, so inspect the pane before acting rather than relaunching on it.
+Interrupting the harness cannot restore autonomy that was never granted at launch, so never try to fix an `unfit` pane with a keystroke; `harness-adapters` owns why.
 
 ## Session-start reconciliation for a dead ordinary direct report
 

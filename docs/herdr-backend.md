@@ -216,6 +216,13 @@ No Herdr-specific copy of that protocol exists.
 
 ## Restart and liveness behavior
 
+Herdr restores a stopped server's layout from its own persisted session state, which records each pane's CREATION cwd and no command.
+Its `[session] resume_agents_on_restore` setting, on by default, then relaunches supported agents from the integration-reported session ref rather than from the command that originally started them.
+For a Firstmate crewmate both halves are lossy: the resume command is Herdr's own, so it carries none of the autonomy flag, model, effort, or env prefixes `bin/fm-spawn.sh` resolved, and the restored pane opens in the project checkout because the task worktree was only ever entered by a `treehouse get` subshell that the persisted creation cwd never followed.
+The result is a pane that is alive, has full conversation context, shows no error, and is permanently unable to work.
+`bin/fm-crew-fitness.sh` detects exactly that pair of losses and the session-start digest runs it for every live endpoint; `bin/fm-crew-relaunch.sh` repairs it by replaying the recorded launch command.
+A stale session ref instead leaves a bare shell where the resume command failed, which the husk classifier below already covers.
+
 Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids, but the underlying harness processes and live agent registrations do not survive.
 A restored same-labeled tab with a missing pane or no registered agent is a husk.
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.

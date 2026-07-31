@@ -361,6 +361,14 @@ for meta in "$STATE"/*.meta; do
     backend=$(fm_backend_of_meta "$meta")
     if fm_backend_target_exists "$backend" "${target:-$window}" "fm-$id"; then
       printf 'endpoint: alive (backend=%s window=%s)\n' "$backend" "$window"
+      # A live endpoint is not proof the pane can still work. After a
+      # session-provider restart a pane can come back alive, with full context
+      # and no error, yet stripped of its autonomy flag and sitting outside its
+      # worktree - permanently stalled on an approval nobody is watching for.
+      # That failure is only ever discovered at a session start like this one,
+      # because the crash that causes it takes the watcher down too. Only alive
+      # endpoints are checked: a dead one already routes to recovery.
+      "$SCRIPT_DIR/fm-crew-fitness.sh" "$id" 2>/dev/null || true
     else
       printf 'endpoint: dead (backend=%s window=%s)\n' "$backend" "$window"
     fi

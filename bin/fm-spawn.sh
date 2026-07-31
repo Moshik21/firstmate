@@ -111,6 +111,11 @@
 #     __PITURNEND__ absolute path to .pi/extensions/fm-primary-turnend-guard.ts in a pi secondmate home
 #     __PIWATCH__   absolute path to .pi/extensions/fm-primary-pi-watch.ts in a pi secondmate home
 #     __OPINPUT__   absolute path to the canonical operational-input encoder
+#   The fully resolved launch command is recorded as launch= in state/<id>.meta.
+#   It is the one durable record of how a task was actually started, so recovery
+#   can replay it byte-for-byte instead of re-deriving flags from memory:
+#   bin/fm-crew-relaunch.sh replays it, and bin/fm-crew-fitness.sh reads it to
+#   learn which autonomy flag that task is supposed to be running with.
 # Verified per-harness turn-end hooks are installed automatically where enabled; some live outside the worktree.
 # Kimi uses one surgically installed Firstmate region in $HOME/.kimi-code/config.toml,
 # a firstmate-owned global hook and registry, and a gitignored per-task pointer.
@@ -1208,21 +1213,10 @@ esac
 # worktree-detection steps below must never reference an unbound WT_TARGET under set -u.
 : "${WT_TARGET:=$T}"
 spawn_send_text_line() {  # <target> <text>
-  case "$BACKEND" in
-    tmux) fm_backend_tmux_send_text_line "$1" "$2" ;;
-    herdr) fm_backend_herdr_send_text_line "$1" "$2" ;;
-    zellij) fm_backend_zellij_send_text_line "$1" "$2" "$W" ;;
-    orca) fm_backend_orca_send_text_line "$1" "$2" ;;
-    cmux) fm_backend_cmux_send_text_line "$1" "$2" "$W" ;;
-  esac
+  fm_backend_send_text_line "$BACKEND" "$1" "$2" "$W"
 }
 spawn_current_path() {  # <target>
-  case "$BACKEND" in
-    tmux) fm_backend_tmux_current_path "$1" ;;
-    herdr) fm_backend_herdr_current_path "$1" ;;
-    zellij) fm_backend_zellij_current_path "$1" "$W" ;;
-    cmux) fm_backend_cmux_current_path "$1" "$W" ;;
-  esac
+  fm_backend_current_path "$BACKEND" "$1" "$W"
 }
 spawn_send_literal() {  # <target> <text>
   case "$BACKEND" in
@@ -1679,6 +1673,17 @@ if [ "$KIND" = secondmate ]; then
   sq_primary_home=$(shell_quote "$FM_HOME")
   LAUNCH="FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME=$sq_primary_home FM_HOME=$sq_home $LAUNCH"
 fi
+# Record the EXACT resolved launch command, after every placeholder, env prefix,
+# and harness/model/effort decision above has been applied. Recovery must be able
+# to relaunch a task byte-identically without re-deriving any of that from memory
+# under pressure; bin/fm-crew-relaunch.sh is its only consumer, and
+# bin/fm-crew-fitness.sh reads it to learn which autonomy flag THIS task was
+# actually launched with. Appended rather than folded into the block above
+# because the launch string is not fully resolved until here, matching how
+# fm-pr-check and fm-x-link already extend a task's metadata after the fact.
+# One line, no newlines: every launch template is a single command line.
+printf 'launch=%s\n' "$LAUNCH" >> "$STATE/$ID.meta"
+
 # Export GOTMPDIR into the crewmate's pane shell so the agent and every child
 # process (go build, go test, ...) inherit it. Sent before the launch command so
 # the env is set when the agent starts; the brief sleep lets the export land.

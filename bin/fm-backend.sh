@@ -721,6 +721,26 @@ fm_backend_send_key() {  # <backend> <target> <key> [expected-label]
   esac
 }
 
+# fm_backend_send_text_line: send one line of TEXT and submit it, with no
+# composer verification. This is the SHELL-command send - used for fixed
+# commands typed at a pane's shell prompt (`treehouse get`, the GOTMPDIR export,
+# a recovery `cd` plus relaunch), never for talking to a running agent. Use
+# fm_backend_send_text_submit for anything that must prove it landed in an
+# agent's composer.
+fm_backend_send_text_line() {  # <backend> <target> <text> [session]
+  local backend=$1
+  shift
+  fm_backend_source "$backend" || return 1
+  case "$backend" in
+    tmux) fm_backend_tmux_send_text_line "$1" "$2" ;;
+    herdr) fm_backend_herdr_send_text_line "$1" "$2" ;;
+    zellij) fm_backend_zellij_send_text_line "$1" "$2" "${3:-}" ;;
+    orca) fm_backend_orca_send_text_line "$1" "$2" ;;
+    cmux) fm_backend_cmux_send_text_line "$1" "$2" "${3:-}" ;;
+    *) echo "error: no send-text-line implementation for backend '$backend'" >&2; return 1 ;;
+  esac
+}
+
 # fm_backend_send_text_submit: type text once, then submit and verify,
 # retrying only the submission (never retyping). Echoes the backend's
 # proof-carrying verdict; callers require exact empty for confirmed delivery.
@@ -866,6 +886,48 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
     *)
       return 1
       ;;
+  esac
+}
+
+# fm_backend_current_path: the live FOREGROUND process's working directory for
+# <target>, or empty when the backend cannot report one. The per-backend readers
+# deliberately track the foreground process rather than the pane's creation-time
+# cwd, because a firstmate crewmate reaches its worktree through a `treehouse
+# get` subshell that the creation-time value never follows.
+fm_backend_current_path() {  # <backend> <target> [session]
+  local backend=$1 target=$2 session=${3:-}
+  fm_backend_source "$backend" || return 0
+  case "$backend" in
+    tmux) fm_backend_tmux_current_path "$target" ;;
+    herdr) fm_backend_herdr_current_path "$target" ;;
+    zellij) fm_backend_zellij_current_path "$target" "$session" ;;
+    cmux) fm_backend_cmux_current_path "$target" "$session" ;;
+    *) return 0 ;;
+  esac
+}
+
+# fm_backend_pane_argv_has: the single three-state contract for "is <element> an
+# argv element of the process actually running in <target> right now".
+#   0 - present as an EXACT whole argv element.
+#   1 - confidently absent.
+#   2 - undeterminable (unsupported backend, failed read, no attributable
+#       foreground process).
+#
+# Exact-element matching is a correctness requirement, not a style choice. A
+# crewmate's argv carries its whole brief as one element, and a brief can quote
+# the very flag being looked for - this task's own brief does. Substring
+# matching over a flattened command line would report a stripped autonomy flag
+# as still present, which is precisely the silent failure this check exists to
+# catch, so any reader that cannot preserve element boundaries must return 2.
+#
+# Callers must treat 2 as "unknown", never as either verdict.
+fm_backend_pane_argv_has() {  # <backend> <target> <element>
+  local backend=$1 target=$2 element=$3
+  fm_backend_source "$backend" || return 2
+  case "$backend" in
+    tmux) fm_backend_tmux_pane_argv_has "$target" "$element" ;;
+    herdr) fm_backend_herdr_pane_argv_has "$target" "$element" ;;
+    *) return 2 ;;
   esac
 }
 
