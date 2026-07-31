@@ -114,6 +114,20 @@ launch_pane() {  # <window> <cwd> <argv...>
   "$REAL_TMUX" -L "$SOCKET" send-keys -t "$SESSION:$win" "$cmd" Enter
 }
 
+# launch_pane_env: the same, with one env prefix in front of the harness, so a
+# pane can be stood up either carrying or missing the env-prefix grant its
+# recorded launch command specifies.
+launch_pane_env() {  # <window> <cwd> <name> <value> <argv...>
+  local win=$1 cwd=$2 name=$3 value=$4
+  shift 4
+  local cmd
+  printf -v cmd 'cd %q && %s=%q %q -c %q' "$cwd" "$name" "$value" "$WORK/shim/claude" 'while :; do sleep 1; done'
+  local a
+  for a in "$@"; do printf -v cmd '%s %q' "$cmd" "$a"; done
+  "$REAL_TMUX" -L "$SOCKET" new-window -d -t "$SESSION:" -n "$win"
+  "$REAL_TMUX" -L "$SOCKET" send-keys -t "$SESSION:$win" "$cmd" Enter
+}
+
 write_meta() {  # <id> <window> <worktree> <launch>
   cat > "$HOME_DIR/state/$1.meta" <<EOF
 window=$2
@@ -208,30 +222,60 @@ assert_contains "$OUT" 'autonomy=n/a' 'a launch with no recognized autonomy flag
 assert_contains "$OUT" 'fitness: fit' 'n/a autonomy with a correct cwd is still fit'
 assert_eq "$RC" 0 'n/a autonomy with a correct cwd exits 0'
 
-# --- an env-prefix grant is unverifiable, so it can never read as fit --------
+# --- an env-prefix grant counts on the autonomy axis, both ways ---------------
 # opencode's autonomy IS its env prefix, and a restart drops an env prefix
-# exactly as it drops a flag. No backend can read a running process's
-# environment, so the axis must cap at unknown rather than call itself satisfied.
-launch_pane fm-envgrant "$WORKTREE" --model opus 'the brief'
-write_meta envgrant "$SESSION:fm-envgrant" "$WORKTREE" \
-  "OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\"}}' opencode --model opus --prompt \"\$(encode)\""
-wait_for_command "$SESSION:fm-envgrant" claude || fail "fake harness did not start for the env-prefix case"
-OUT=$("$FITNESS" envgrant); RC=$?
-assert_contains "$OUT" 'autonomy=unknown' 'an env-prefix autonomy grant reports unknown, not n/a'
-assert_not_contains "$OUT" 'fitness: fit' 'an unverifiable env-prefix grant never reports fit'
-assert_eq "$RC" 3 'an unverifiable env-prefix grant exits 3'
+# exactly as it drops a flag. It carries a JSON value with a glob character in
+# it, which is exactly the value whole-entry matching has to survive.
+OPENCODE_GRANT='{"permission":{"*":"allow"}}'
+OPENCODE_LAUNCH="OPENCODE_CONFIG_CONTENT='$OPENCODE_GRANT' opencode --model opus --prompt \"\$(encode)\""
 
-# The same rule with a flag present: a secondmate carries FM_HOME, which is what
-# makes it address its own home, and losing it breaks the worker just as surely.
-# The flag reading ok must not be allowed to certify the whole axis.
+launch_pane fm-envlost "$WORKTREE" --model opus 'the brief'
+write_meta envlost "$SESSION:fm-envlost" "$WORKTREE" "$OPENCODE_LAUNCH"
+wait_for_command "$SESSION:fm-envlost" claude || fail "fake harness did not start for the dropped-env-prefix case"
+OUT=$("$FITNESS" envlost); RC=$?
+assert_contains "$OUT" 'autonomy=lost' 'a dropped env-prefix grant is detected as lost, not excused as n/a'
+assert_contains "$OUT" 'OPENCODE_CONFIG_CONTENT=' 'the detail names the env-prefix grant that is gone'
+assert_eq "$RC" 1 'a dropped env-prefix grant exits 1'
+
+launch_pane_env fm-envok "$WORKTREE" OPENCODE_CONFIG_CONTENT "$OPENCODE_GRANT" --model opus 'the brief'
+write_meta envok "$SESSION:fm-envok" "$WORKTREE" "$OPENCODE_LAUNCH"
+wait_for_command "$SESSION:fm-envok" claude || fail "fake harness did not start for the intact-env-prefix case"
+OUT=$("$FITNESS" envok); RC=$?
+assert_contains "$OUT" 'fitness: fit (autonomy=ok cwd=ok)' 'an env-prefix grant still in force reads ok, not a permanent unknown'
+assert_eq "$RC" 0 'an env-prefix grant still in force exits 0'
+
+# A secondmate carries FM_HOME, which is what makes it address its own home
+# rather than its parent's. A flag reading ok must not certify the whole axis
+# while that prefix is gone.
 launch_pane fm-secondmate "$WORKTREE" --dangerously-skip-permissions --model opus 'the brief'
 write_meta secondmate "$SESSION:fm-secondmate" "$WORKTREE" \
-  "FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_HOME='$HOME_DIR' CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude --dangerously-skip-permissions --model opus \"\$(encode)\""
+  "FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_HOME='$WORK/secondmate-home' CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude --dangerously-skip-permissions --model opus \"\$(encode)\""
 wait_for_command "$SESSION:fm-secondmate" claude || fail "fake harness did not start for the secondmate case"
 OUT=$("$FITNESS" secondmate); RC=$?
-assert_contains "$OUT" 'autonomy=unknown' 'a secondmate FM_HOME prefix caps the autonomy axis at unknown'
-assert_not_contains "$OUT" 'fitness: fit' 'a secondmate that may have lost its FM_HOME prefix never reports fit'
-assert_eq "$RC" 3 'a secondmate with an unverifiable identity prefix exits 3'
+assert_contains "$OUT" 'autonomy=lost' 'a secondmate that lost its FM_HOME prefix is unfit even with its flag intact'
+assert_contains "$OUT" 'FM_HOME=' 'the detail names the lost secondmate identity prefix'
+assert_eq "$RC" 1 'a secondmate that lost its identity prefix exits 1'
+
+# A value this cannot decode with certainty must be unknown, never a claim that
+# the grant is missing: a recorded value containing a space is split across
+# words and can no longer be compared.
+launch_pane fm-envundecodable "$WORKTREE" --model opus 'the brief'
+write_meta envundecodable "$SESSION:fm-envundecodable" "$WORKTREE" \
+  "OPENCODE_CONFIG_CONTENT='a value with spaces' opencode --model opus"
+wait_for_command "$SESSION:fm-envundecodable" claude || fail "fake harness did not start for the undecodable-grant case"
+OUT=$("$FITNESS" envundecodable); RC=$?
+assert_contains "$OUT" 'autonomy=unknown' 'an undecodable recorded grant is unknown'
+assert_not_contains "$OUT" 'autonomy=lost' 'an undecodable recorded grant is never claimed to be lost'
+assert_not_contains "$OUT" 'fitness: fit' 'an undecodable recorded grant never reports fit'
+assert_eq "$RC" 3 'an undecodable recorded grant exits 3'
+
+# --- the env contract itself: a backend that cannot see an environment --------
+# herdr's pane process-info exposes argv, argv0, cmdline, cwd, name, and pid and
+# no environment at all, so it must answer undeterminable rather than absent.
+( . "$ROOT/bin/fm-backend.sh"; fm_backend_pane_env_has herdr default:w1:p2 'FM_HOME=/tmp/x' )
+assert_eq "$?" 2 'a backend that cannot read an environment answers undeterminable, never absent'
+( . "$ROOT/bin/fm-backend.sh"; fm_backend_pane_env_has tmux "$SESSION:fm-envok" 'not-an-entry' )
+assert_eq "$?" 2 'a malformed environment entry is undeterminable, never a verdict'
 
 # --- fail closed: unreadable or unrecorded inputs are unknown, never fit -----
 launch_pane fm-nolaunch "$WORKTREE" --dangerously-skip-permissions
@@ -395,8 +439,15 @@ EOF
 OUT=$("$RELAUNCH" spaced --dry-run); RC=$?
 assert_eq "$RC" 0 '--dry-run on a task with a recorded tasktmp exits 0'
 assert_contains "$OUT" 'would send env: export GOTMPDIR=' '--dry-run names the GOTMPDIR export it would replay'
+[ -d "$SPACED_TMP/gotmp" ] && fail '--dry-run must not create the GOTMPDIR it would export'
+[ -d "$SPACED_TMP/gotmp" ] || pass '--dry-run creates nothing'
 
+# The reboot this repair exists to recover from is exactly what clears the task
+# tmp root, and Go does not create GOTMPDIR, so exporting the path without
+# recreating the directory would break the relaunched agent's first build.
 OUT=$("$RELAUNCH" spaced 2>&1); RC=$?
+[ -d "$SPACED_TMP/gotmp" ] || fail 'the repair must recreate the GOTMPDIR it exports'
+[ -d "$SPACED_TMP/gotmp" ] && pass 'the repair recreates the task GOTMPDIR the reboot removed'
 assert_eq "$RC" 0 'relaunch into a worktree path containing a space succeeds'
 wait_for_command "$SESSION:fm-spaced" claude || fail 'relaunch did not bring the harness up in the spaced worktree'
 

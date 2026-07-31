@@ -135,9 +135,22 @@ printf -v CD_CMD 'cd %q' "$WORKTREE"
 # around the original launch is gone with it. GOTMPDIR is the one piece the
 # agent and every child process it starts inherit, and the task's own tmp root
 # is already recorded, so replay it exactly as fm-spawn.sh does.
+#
+# The directory has to be recreated, not just named. Go does not create GOTMPDIR
+# (fm-spawn.sh makes the same point where it first sets it), and the tmp root is
+# /tmp/fm-<id>, which the very reboot this script recovers from is what clears -
+# so exporting the path alone would hand the agent a GOTMPDIR that does not
+# exist and break its first build instead of repairing it. mkdir -p creates only
+# that path and touches nothing in the recorded worktree. If it cannot be
+# created the export is dropped entirely, because Go's own default temp is a
+# working fallback and a dangling GOTMPDIR is not.
 TASKTMP=$(fm_meta_get "$META" tasktmp)
 GOTMP_CMD=
-[ -z "$TASKTMP" ] || printf -v GOTMP_CMD 'export GOTMPDIR=%q' "$TASKTMP/gotmp"
+GOTMP_DIR=
+if [ -n "$TASKTMP" ]; then
+  GOTMP_DIR="$TASKTMP/gotmp"
+  printf -v GOTMP_CMD 'export GOTMPDIR=%q' "$GOTMP_DIR"
+fi
 
 # The task LABEL, not the recorded target string: zellij and cmux verify the
 # tab/workspace title against this before sending. It is the same value
@@ -148,6 +161,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   printf 'would append recovery note to: %s\n' "$BRIEF"
   printf 'would cd pane %s (backend=%s) to: %s\n' "$TARGET" "$BACKEND" "$WORKTREE"
   if [ -n "$GOTMP_CMD" ]; then
+    printf 'would create: %s\n' "$GOTMP_DIR"
     printf 'would send env: %s\n' "$GOTMP_CMD"
   else
     printf 'would send no GOTMPDIR export: task has no recorded tasktmp\n'
@@ -156,7 +170,14 @@ if [ "$DRY_RUN" -eq 1 ]; then
   exit 0
 fi
 
-[ -n "$GOTMP_CMD" ] || printf 'warning: task %s has no recorded tasktmp; relaunching without the GOTMPDIR export fm-spawn.sh normally sets\n' "$ID" >&2
+if [ -n "$GOTMP_CMD" ]; then
+  if ! mkdir -p "$GOTMP_DIR" 2>/dev/null; then
+    printf 'warning: could not create %s; relaunching without the GOTMPDIR export so the agent falls back to the default temp\n' "$GOTMP_DIR" >&2
+    GOTMP_CMD=
+  fi
+else
+  printf 'warning: task %s has no recorded tasktmp; relaunching without the GOTMPDIR export fm-spawn.sh normally sets\n' "$ID" >&2
+fi
 
 # Append the recovery note BEFORE relaunching: the launch command re-reads the
 # brief from disk, so a note written afterwards would be invisible to the agent

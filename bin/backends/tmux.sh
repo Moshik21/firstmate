@@ -101,26 +101,39 @@ fm_backend_tmux_current_path() {  # <target>
   tmux display-message -p -t "$1" '#{pane_current_path}' 2>/dev/null
 }
 
+# fm_backend_tmux_foreground_pids: the pids of <target>'s FOREGROUND process
+# group, one per line, or nonzero when that group cannot be resolved at all.
+# tmux exposes no process formatter beyond the pane's controlling tty, so the
+# tty's foreground process-group id is the only handle on "what is actually
+# running in this pane right now". Shared by the argv and environment readers,
+# which ask different questions about exactly the same processes.
+fm_backend_tmux_foreground_pids() {  # <target>
+  local target=$1 tty tpgid pids
+  tty=$(tmux display-message -p -t "$target" '#{pane_tty}' 2>/dev/null) || return 1
+  [ -n "$tty" ] || return 1
+  tpgid=$(ps -t "$tty" -o tpgid= 2>/dev/null | tr -d ' ' | grep -E '^[0-9]+$' | head -1)
+  case "$tpgid" in ''|*[!0-9]*) return 1 ;; esac
+  pids=$(ps -t "$tty" -o pgid=,pid= 2>/dev/null | awk -v g="$tpgid" '$1 == g { print $2 }')
+  [ -n "$pids" ] || return 1
+  printf '%s\n' "$pids"
+}
+
 # fm_backend_tmux_pane_argv_has: 0 if any argv element of the pane's FOREGROUND
 # process group is EXACTLY <element>, 1 if it is confidently absent, 2 if the
 # answer cannot be established. See fm-backend.sh's fm_backend_pane_argv_has for
 # the shared contract and why exact-element (never substring) matching is
 # mandatory.
 #
-# tmux exposes no argv formatter, so this resolves the pane's controlling tty,
-# reads that tty's foreground process-group id, and reads the NUL-separated
-# /proc/<pid>/cmdline of every process in that group. NUL separation is what
-# makes exact-element matching possible; a space-joined `ps -o args=` fallback
-# could not tell a real flag apart from a brief that merely mentions it, so a
-# host without a readable /proc returns 2 (undeterminable) rather than guessing.
+# The element boundaries come from the NUL-separated /proc/<pid>/cmdline of
+# every process in the pane's foreground group. NUL separation is what makes
+# exact-element matching possible; a space-joined `ps -o args=` fallback could
+# not tell a real flag apart from a brief that merely mentions it, so a host
+# without a readable /proc returns 2 (undeterminable) rather than guessing.
 fm_backend_tmux_pane_argv_has() {  # <target> <element>
-  local target=$1 want=$2 tty tpgid pid found=1
+  local want=$2 pid found=1 pids
   [ -r /proc/self/cmdline ] || return 2
-  tty=$(tmux display-message -p -t "$target" '#{pane_tty}' 2>/dev/null) || return 2
-  [ -n "$tty" ] || return 2
-  tpgid=$(ps -t "$tty" -o tpgid= 2>/dev/null | tr -d ' ' | grep -E '^[0-9]+$' | head -1)
-  case "$tpgid" in ''|*[!0-9]*) return 2 ;; esac
-  for pid in $(ps -t "$tty" -o pgid=,pid= 2>/dev/null | awk -v g="$tpgid" '$1 == g { print $2 }'); do
+  pids=$(fm_backend_tmux_foreground_pids "$1") || return 2
+  for pid in $pids; do
     [ -r "/proc/$pid/cmdline" ] || continue
     found=0
     if tr '\0' '\n' < "/proc/$pid/cmdline" 2>/dev/null | grep -qxF -- "$want"; then
@@ -129,6 +142,39 @@ fm_backend_tmux_pane_argv_has() {  # <target> <element>
   done
   # found stays 1 when no foreground process was readable at all: that is an
   # undeterminable read, not proof the element is absent.
+  [ "$found" -eq 0 ] || return 2
+  return 1
+}
+
+# fm_backend_tmux_pane_env_has: 0 if any environment entry of the pane's
+# FOREGROUND process group is EXACTLY <entry> (a whole NAME=value string), 1 if
+# it is confidently absent, 2 if the answer cannot be established. See
+# fm-backend.sh's fm_backend_pane_env_has for the shared contract.
+#
+# /proc/<pid>/environ is NUL-separated exactly like cmdline, so whole entries
+# survive and can be compared without any parsing of the value. It holds the
+# environment the process was EXECed with, which is precisely the question:
+# whether the env prefix its recorded launch command specified is still in force
+# or was dropped by a restart that rebuilt the command.
+#
+# Verified readable for a same-uid process on Linux 6.18 (WSL2) with
+# kernel.yama.ptrace_scope=1 and no hidepid mount option, against a live agent
+# pane the reader did not start (docs/verification/runtime-backends.md,
+# "Foreground argv and environment"). Readability is NOT universal: a host with
+# no /proc at all (macOS), a hidepid=2 mount, and a process owned by another
+# user each make the read fail, and every one of them returns 2 rather than
+# reporting a grant absent that was merely unreadable.
+fm_backend_tmux_pane_env_has() {  # <target> <entry>
+  local want=$2 pid found=1 pids
+  [ -r /proc/self/environ ] || return 2
+  pids=$(fm_backend_tmux_foreground_pids "$1") || return 2
+  for pid in $pids; do
+    [ -r "/proc/$pid/environ" ] || continue
+    found=0
+    if tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -qxF -- "$want"; then
+      return 0
+    fi
+  done
   [ "$found" -eq 0 ] || return 2
   return 1
 }

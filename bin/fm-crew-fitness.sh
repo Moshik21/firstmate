@@ -23,11 +23,13 @@
 #
 #   autonomy - every autonomy-granting flag that THIS task's recorded launch
 #              command specified is still an exact argv element of the process
-#              running in the pane right now.
+#              running in the pane right now, and every autonomy-granting env
+#              prefix it specified is still an exact entry in that process's
+#              environment.
 #   cwd      - the pane's live foreground cwd is still the task's recorded
 #              worktree.
 #
-# The autonomy flag set is never inferred per harness. It is intersected with the
+# The grant set is never inferred per harness. It is intersected with the
 # task's own recorded `launch=`, so whatever fm-spawn.sh's launch_template
 # actually used for this task is what gets enforced, and changing a template can
 # never leave this check silently asserting a stale flag.
@@ -41,14 +43,16 @@
 #   2. Otherwise either axis unknown -> unknown.
 #   3. Otherwise -> fit.
 #
+# A grant that rides an ENV PREFIX rather than a flag counts on the same axis,
+# because a restart that rebuilds the launch command drops an env prefix exactly
+# as it drops a flag. It is read where it can be read and reported `unknown`
+# where it cannot; it is never assumed satisfied.
+#
 # It FAILS CLOSED toward unknown and never toward fit: every unreadable target,
 # unsupported backend, missing record, or unattributable process is `unknown`,
 # because a false `fit` is exactly the silent failure this script exists to end.
-# `n/a` is not a failure - it means the recorded launch command needed no grant
-# at all (pi), so there is nothing whose loss could be detected. A grant that
-# rides an ENV PREFIX rather than a flag is `unknown`, not `n/a`: a restart drops
-# an env prefix exactly as it drops a flag, and no backend can read a running
-# process's environment, so reporting it satisfied would be a false `fit`.
+# `n/a` is not a failure - it means the recorded launch command carried no grant
+# of either kind (pi), so there is nothing whose loss could be detected.
 #
 # Read-only and side-effect free. Exit status: 0 fit, 1 unfit, 3 unknown,
 # 2 usage error. The exit status lets a caller branch without parsing the line.
@@ -60,8 +64,8 @@ usage: fm-crew-fitness.sh <task-id>
        fm-crew-fitness.sh --all
 
 Reports whether a recorded task's pane is still able to work: its harness still
-carries the autonomy flags its recorded launch command specified, and it is
-still in the task's recorded worktree.
+carries the autonomy grants its recorded launch command specified, as flags and
+as env prefixes, and it is still in the task's recorded worktree.
 
   <task-id>   report on one task
   --all       report on every state/*.meta in this home, one line per task,
@@ -92,18 +96,18 @@ AUTONOMY_FLAGS='--dangerously-skip-permissions
 --auto'
 
 # Env-prefix names in a recorded launch command that carry a grant the worker
-# cannot work without, and that NO backend can verify: a running process's
-# environment is not readable through any session-provider surface, and argv
-# does not carry it. A restart that rebuilds the launch command drops these
-# exactly as it drops a flag, so their presence caps the autonomy axis at
-# `unknown` rather than letting it read satisfied.
+# cannot work without. These do not appear in argv at all, so they are read
+# through fm_backend_pane_env_has, which answers from the running process's own
+# environment where the backend can reach it (tmux) and `undeterminable` where
+# it cannot (herdr's process-info exposes no environment; a host without /proc).
+# An undeterminable grant is `unknown`, never satisfied.
 #
 # Membership is deliberately narrow - only prefixes whose loss leaves the worker
 # unable to do its job. opencode's OPENCODE_CONFIG_CONTENT IS its permission
 # grant, and FM_HOME is what makes a secondmate address its own home rather than
 # its parent's. Prefixes that merely tune a working agent (claude's
 # CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION, pi's FM_PI_HARNESS) are not listed,
-# because condemning every task to `unknown` for them would retire the check.
+# because a task is not unfit for having lost one.
 AUTONOMY_ENV_GRANTS='OPENCODE_CONFIG_CONTENT
 FM_HOME'
 
@@ -147,10 +151,10 @@ $AUTONOMY_FLAGS
 EOF
 }
 
-# launch_env_grants: the names of the unverifiable env-prefix grants that
-# <launch> carries. Only the LEADING assignment words are considered, because
-# only those are env prefixes of the command itself; a `NAME=value` appearing
-# later is an argument to the harness, not part of its environment.
+# launch_env_grants: the recognized env-prefix grant words of <launch>, whole,
+# as they were recorded. Only the LEADING assignment words are considered,
+# because only those are env prefixes of the command itself; a `NAME=value`
+# appearing later is an argument to the harness, not part of its environment.
 launch_env_grants() {  # <launch-command>
   local word name grant
   local -a words=()
@@ -162,11 +166,34 @@ launch_env_grants() {  # <launch-command>
     esac
     while IFS= read -r grant; do
       [ -n "$grant" ] || continue
-      [ "$name" = "$grant" ] && printf '%s\n' "$name"
+      [ "$name" = "$grant" ] && printf '%s\n' "$word"
     done <<EOF
 $AUTONOMY_ENV_GRANTS
 EOF
   done
+}
+
+# shell_unquote: the inverse of fm-spawn.sh's shell_quote, for the two forms a
+# recorded launch word's value can take - a fully single-quoted string, where an
+# embedded quote appears as the '\'' sequence, or a bare word carrying no shell
+# metacharacter at all. Prints the literal value the pane's shell would have
+# exported. Returns 1 for anything else, including a value that was split across
+# words because it contained a space, because a value this cannot decode with
+# certainty must be reported unknown rather than compared and found "missing".
+shell_unquote() {  # <word>
+  local v=$1 tmp
+  case "$v" in
+    \'*\')
+      [ "${#v}" -ge 2 ] || return 1
+      v=${v#\'}
+      v=${v%\'}
+      tmp=${v//\'\\\'\'/$'\x01'}
+      case "$tmp" in *\'*) return 1 ;; esac
+      printf '%s' "${tmp//$'\x01'/\'}"
+      ;;
+    *[\'\"\\\$\`]*) return 1 ;;
+    *) printf '%s' "$v" ;;
+  esac
 }
 
 report() {  # <verdict> <autonomy> <cwd> [detail]
@@ -232,37 +259,53 @@ check_one() {  # <task-id>
     detail="no launch command recorded (spawned before this was tracked); deterministic relaunch is unavailable for this task"
   else
     local -a want=() env_grants=()
+    local grant name value
     while IFS= read -r flag; do
       [ -n "$flag" ] || continue
       want+=("$flag")
     done < <(launch_autonomy_flags "$launch")
-    while IFS= read -r flag; do
-      [ -n "$flag" ] || continue
-      env_grants+=("$flag")
+    while IFS= read -r grant; do
+      [ -n "$grant" ] || continue
+      env_grants+=("$grant")
     done < <(launch_env_grants "$launch")
-    if [ "${#want[@]}" -eq 0 ]; then
-      # The recorded launch carries no flag whose loss could be detected.
+    if [ "${#want[@]}" -eq 0 ] && [ "${#env_grants[@]}" -eq 0 ]; then
+      # The recorded launch carries no grant whose loss could be detected.
       autonomy=n/a
     else
       autonomy=ok
-      for flag in "${want[@]}"; do
+      for flag in "${want[@]+"${want[@]}"}"; do
         fm_backend_pane_argv_has "$backend" "$target" "$flag"
         rc=$?
         case "$rc" in
           0) ;;
           1) lost+=("$flag"); autonomy=lost ;;
           # An undeterminable read cannot clear an ALREADY-PROVEN loss: one
-          # confidently absent flag is enough to condemn the pane.
+          # confidently absent grant is enough to condemn the pane.
           *) [ "$autonomy" = lost ] || autonomy=unknown; break ;;
         esac
       done
-    fi
-    # An unverifiable env-prefix grant caps the axis. It can never CLEAR a
-    # proven loss, only refuse to call the axis satisfied - which is the whole
-    # point, because a restart drops an env prefix exactly as it drops a flag.
-    if [ "${#env_grants[@]}" -gt 0 ] && [ "$autonomy" != lost ]; then
-      autonomy=unknown
-      detail="the recorded launch grants autonomy through the env prefix ${env_grants[*]}, which no backend can read from a running process; verify it by hand or relaunch"
+      # Env-prefix grants are read from the live process's own environment. Only
+      # a grant actually READ as present counts as satisfied: an undeterminable
+      # read is unknown, never assumed in force, because assuming it is the
+      # false `fit` this whole script exists to prevent.
+      for grant in "${env_grants[@]+"${env_grants[@]}"}"; do
+        name=${grant%%=*}
+        if ! value=$(shell_unquote "${grant#*=}"); then
+          [ "$autonomy" = lost ] || autonomy=unknown
+          [ -n "$detail" ] || detail="could not decode the recorded env-prefix grant $name= to compare it against the running process"
+          continue
+        fi
+        fm_backend_pane_env_has "$backend" "$target" "$name=$value"
+        rc=$?
+        case "$rc" in
+          0) ;;
+          1) lost+=("$name="); autonomy=lost ;;
+          *)
+            [ "$autonomy" = lost ] || autonomy=unknown
+            [ -n "$detail" ] || detail="could not read the running process's environment on backend=$backend, so the env-prefix grant $name= is unproven; verify it by hand or relaunch"
+            ;;
+        esac
+      done
     fi
   fi
 
@@ -292,7 +335,7 @@ check_one() {  # <task-id>
 
   # --- verdict --------------------------------------------------------------
   if [ "$autonomy" = lost ] || [ "$cwd" = wrong ]; then
-    [ "$autonomy" != lost ] || detail="autonomy flag no longer in force: ${lost[*]:-}"
+    [ "$autonomy" != lost ] || detail="autonomy grant no longer in force: ${lost[*]:-}"
     if [ "$cwd" = wrong ]; then
       if [ -n "$detail" ]; then
         detail="$detail; pane is in $live, not the recorded worktree $worktree"

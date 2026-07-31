@@ -117,6 +117,39 @@ Valid cleanup removed only the exact task-bound target and left the control wind
 The metadata-only validation covers tmux, Herdr, Zellij, Orca, and cmux before backend dispatch.
 Claude, Codex, OpenCode, Pi, pi-signed, Grok, and Kimi share that backend cleanup boundary; their harness-specific hook files and token cleanup run only after it, so no harness needs a separate endpoint parser.
 
+### Foreground argv and environment
+
+`fm_backend_tmux_pane_argv_has` and `fm_backend_tmux_pane_env_has` answer whether an exact argv element or an exact `NAME=value` environment entry is still in force in a live pane, which is what `bin/fm-crew-fitness.sh` reads to detect a worker that came back from a restart without the autonomy grant it was launched with.
+tmux exposes no argv or environment formatter, so both resolve the pane's controlling tty, take that tty's foreground process-group id, and read the NUL-separated `/proc/<pid>/cmdline` and `/proc/<pid>/environ` of the processes in that group.
+
+The environment half was verified on 2026-07-31 on Linux 6.18.33.1 (WSL2, x86_64):
+
+```sh
+grep ' /proc ' /proc/mounts
+cat /proc/sys/kernel/yama/ptrace_scope
+stat -c '%U' /proc/<pid-of-a-live-agent>
+tr '\0' '\n' < /proc/<pid-of-a-live-agent>/environ | wc -l
+MY_TEST_GRANT='{"permission":{"*":"allow"}}' bash -c 'sleep 3 & tr "\0" "\n" < /proc/$!/environ | grep -c "^MY_TEST_GRANT="'
+```
+
+```text
+proc /proc proc rw,nosuid,nodev,noexec,noatime 0 0
+1
+konne
+31
+1
+```
+
+A same-uid process the reader did not start was readable with `kernel.yama.ptrace_scope=1` and no `hidepid` mount option, because that gate covers ptrace ATTACH rather than this read.
+An env prefix of the `NAME=value command` form appears verbatim as a whole NUL-separated entry in the child's environment, including a JSON value carrying glob characters, so whole-entry matching needs no parsing of the value.
+
+Readability is deliberately NOT claimed to be universal.
+A host with no `/proc` at all, which is every macOS host and therefore the captain's own primary machine, a `hidepid=2` mount, and a process owned by another user each make the read fail, and none of those three was exercised here.
+Every one of them returns the shared contract's `2` (undeterminable), which `bin/fm-crew-fitness.sh` reports as `unknown`, so an unreadable grant is never reported as a grant that was lost and never counted as one still in force.
+The same `2` is what the herdr adapter returns for every environment question, because its `pane process-info` exposes argv, argv0, cmdline, cwd, name, and pid and no environment at all.
+
+The three-state contract for both readers is exercised through the fitness and relaunch behavior in `tests/fm-crew-fitness.test.sh`, and the herdr argv reader additionally in `tests/fm-backend-herdr.test.sh`.
+
 ## Herdr
 
 The compatibility floor is protocol 14.
@@ -173,6 +206,7 @@ herdr pane process-info --pane <id>
 ```
 
 The response envelope is `.result.process_info`, `foreground_processes[].argv` is an array of strings or null, and `argv` is nullable while `cmdline` is a flattened string, which is why the adapter reads the array and never the string.
+The same schema is the reason herdr can answer nothing about a process's ENVIRONMENT: its per-process fields are exactly argv, argv0, cmdline, cwd, name, and pid, so `fm_backend_pane_env_has` returns undeterminable for herdr rather than reporting an env-prefix grant absent that it simply cannot see.
 The second live pane was a firstmate crewmate launched with the full autonomy shape, whose argv carried `--dangerously-skip-permissions` as its own element alongside the whole encoded brief as a single further element.
 Running the adapter's own predicate `any(.result.process_info.foreground_processes[]?.argv[]?; . == $want)` against that pair returned true for the autonomous pane and false for the `claude --resume` pane, which is exactly the restart failure shape the check exists to catch.
 

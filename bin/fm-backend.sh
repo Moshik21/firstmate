@@ -967,6 +967,44 @@ fm_backend_pane_argv_has() {  # <backend> <target> <element>
   esac
 }
 
+# fm_backend_pane_env_has: the same three-state contract for "is <entry>, a
+# whole NAME=value environment entry, part of the environment of the process
+# actually running in <target> right now".
+#   0 - present as an EXACT whole entry.
+#   1 - confidently absent.
+#   2 - undeterminable (unsupported backend, failed read, no attributable
+#       foreground process).
+#
+# This exists because not every grant a launch command carries rides in argv:
+# opencode's permission grant and a secondmate's home are env prefixes, and a
+# restart that rebuilds the launch command drops those exactly as it drops a
+# flag. Whole-entry matching is required for the same reason as argv - a value
+# can contain anything, including another entry's name.
+#
+# Backend support is narrower than argv on purpose. tmux resolves the pane's own
+# foreground pids and reads /proc/<pid>/environ. herdr's `pane process-info`
+# reports argv, argv0, cmdline, cwd, name, and pid, and NO environment at all,
+# so herdr answers 2 - honestly undeterminable rather than falsely absent.
+#
+# Callers must treat 2 as "unknown", never as either verdict.
+fm_backend_pane_env_has() {  # <backend> <target> <entry>
+  local backend=$1 target=$2 entry=$3
+  # An entry must be one whole NAME=value line. A malformed entry has nothing to
+  # match against, and a newline inside one cannot survive the line-oriented
+  # comparison every reader uses, so both are left unanswered rather than
+  # answered wrongly.
+  case "$entry" in
+    *$'\n'*) return 2 ;;
+    [A-Za-z_]*=*) ;;
+    *) return 2 ;;
+  esac
+  fm_backend_source "$backend" || return 2
+  case "$backend" in
+    tmux) fm_backend_tmux_pane_env_has "$target" "$entry" ;;
+    *) return 2 ;;
+  esac
+}
+
 # fm_backend_agent_state: the single recovery-grade agent/endpoint state
 # contract. It is deliberately richer than fm_backend_target_exists's cheap
 # pane-presence read and prints exactly one of:
