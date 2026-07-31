@@ -208,6 +208,31 @@ assert_contains "$OUT" 'autonomy=n/a' 'a launch with no recognized autonomy flag
 assert_contains "$OUT" 'fitness: fit' 'n/a autonomy with a correct cwd is still fit'
 assert_eq "$RC" 0 'n/a autonomy with a correct cwd exits 0'
 
+# --- an env-prefix grant is unverifiable, so it can never read as fit --------
+# opencode's autonomy IS its env prefix, and a restart drops an env prefix
+# exactly as it drops a flag. No backend can read a running process's
+# environment, so the axis must cap at unknown rather than call itself satisfied.
+launch_pane fm-envgrant "$WORKTREE" --model opus 'the brief'
+write_meta envgrant "$SESSION:fm-envgrant" "$WORKTREE" \
+  "OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\"}}' opencode --model opus --prompt \"\$(encode)\""
+wait_for_command "$SESSION:fm-envgrant" claude || fail "fake harness did not start for the env-prefix case"
+OUT=$("$FITNESS" envgrant); RC=$?
+assert_contains "$OUT" 'autonomy=unknown' 'an env-prefix autonomy grant reports unknown, not n/a'
+assert_not_contains "$OUT" 'fitness: fit' 'an unverifiable env-prefix grant never reports fit'
+assert_eq "$RC" 3 'an unverifiable env-prefix grant exits 3'
+
+# The same rule with a flag present: a secondmate carries FM_HOME, which is what
+# makes it address its own home, and losing it breaks the worker just as surely.
+# The flag reading ok must not be allowed to certify the whole axis.
+launch_pane fm-secondmate "$WORKTREE" --dangerously-skip-permissions --model opus 'the brief'
+write_meta secondmate "$SESSION:fm-secondmate" "$WORKTREE" \
+  "FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_HOME='$HOME_DIR' CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude --dangerously-skip-permissions --model opus \"\$(encode)\""
+wait_for_command "$SESSION:fm-secondmate" claude || fail "fake harness did not start for the secondmate case"
+OUT=$("$FITNESS" secondmate); RC=$?
+assert_contains "$OUT" 'autonomy=unknown' 'a secondmate FM_HOME prefix caps the autonomy axis at unknown'
+assert_not_contains "$OUT" 'fitness: fit' 'a secondmate that may have lost its FM_HOME prefix never reports fit'
+assert_eq "$RC" 3 'a secondmate with an unverifiable identity prefix exits 3'
+
 # --- fail closed: unreadable or unrecorded inputs are unknown, never fit -----
 launch_pane fm-nolaunch "$WORKTREE" --dangerously-skip-permissions
 cat > "$HOME_DIR/state/nolaunch.meta" <<EOF
@@ -272,6 +297,20 @@ ERR=$("$RELAUNCH" nolaunch 2>&1 >/dev/null); RC=$?
 assert_contains "$ERR" 'no recorded launch command' 'relaunch refuses without a recorded launch command'
 assert_eq "$RC" 1 'relaunch refusal without a launch command exits 1'
 
+# --- a vanished endpoint is a respawn, and refusing it must cost nothing ------
+# There is no pane to relaunch into, so the only honest answer is a refusal -
+# and it has to happen before the brief is written, or a failed repair leaves a
+# recovery note claiming a relaunch that never occurred.
+mkdir -p "$HOME_DIR/data/vanished"
+printf '# Brief\n\nOriginal task instructions.\n' > "$HOME_DIR/data/vanished/brief.md"
+BRIEF_BEFORE=$(cat "$HOME_DIR/data/vanished/brief.md")
+write_meta vanished "$SESSION:fm-endpoint-is-gone" "$WORKTREE" "$AUTONOMOUS_LAUNCH"
+ERR=$("$RELAUNCH" vanished 2>&1 >/dev/null); RC=$?
+assert_contains "$ERR" 'respawn, not a relaunch' 'relaunch refuses a vanished endpoint as a respawn'
+assert_eq "$RC" 1 'relaunch refusal for a vanished endpoint exits 1'
+assert_eq "$(cat "$HOME_DIR/data/vanished/brief.md")" "$BRIEF_BEFORE" \
+  'a refused relaunch leaves the brief exactly as it was'
+
 # --- the repair itself -------------------------------------------------------
 # Set the broken pane up exactly as the crash left it: no autonomy flag, sitting
 # in the project checkout, with the task's real uncommitted work in its worktree.
@@ -324,6 +363,51 @@ assert_contains "$(cat "$HOME_DIR/data/repair/brief.md")" 'Recovery note' \
   'the repair leaves a recovery note in the brief'
 assert_contains "$(cat "$HOME_DIR/data/repair/brief.md")" 'Original task instructions' \
   'the repair preserves the original brief'
+
+# --- the repair lands in the right directory and restores the task env -------
+# A worktree path holding a space proves the sent `cd` is shell-quoted: unquoted,
+# the pane would cd to a truncated path and the launch would be typed there while
+# the script still reported success. GOTMPDIR proves the pane's env is restored,
+# because a restart leaves a fresh shell that never saw fm-spawn.sh's export.
+SPACED="$WORK/task worktree"
+git -C "$PROJECT" worktree add -q -b spaced-task "$SPACED"
+echo "spaced uncommitted work" > "$SPACED/uncommitted.txt"
+SPACED_TMP="$WORK/tasktmp with space"
+SPACED_OUT="$WORK/spaced-out"
+mkdir -p "$SPACED_OUT"
+mkdir -p "$HOME_DIR/data/spaced"
+printf '# Brief\n\nOriginal task instructions.\n' > "$HOME_DIR/data/spaced/brief.md"
+SPACED_INNER="printf '%s\n' \"\$PWD\" > '$SPACED_OUT/cwd.txt'; printf '%s\n' \"\${GOTMPDIR:-unset}\" > '$SPACED_OUT/gotmp.txt'; while :; do sleep 1; done"
+printf -v SPACED_LAUNCH '%q -c %q --dangerously-skip-permissions' "$WORK/shim/claude" "$SPACED_INNER"
+cat > "$HOME_DIR/state/spaced.meta" <<EOF
+window=$SESSION:fm-spaced
+worktree=$SPACED
+project=$PROJECT
+harness=claude
+kind=ship
+tasktmp=$SPACED_TMP
+launch=$SPACED_LAUNCH
+EOF
+# A bare shell window: the endpoint exists but no agent owns it, which is the
+# only state a relaunch is licensed for.
+"$REAL_TMUX" -L "$SOCKET" new-window -d -t "$SESSION:" -n fm-spaced
+
+OUT=$("$RELAUNCH" spaced --dry-run); RC=$?
+assert_eq "$RC" 0 '--dry-run on a task with a recorded tasktmp exits 0'
+assert_contains "$OUT" 'would send env: export GOTMPDIR=' '--dry-run names the GOTMPDIR export it would replay'
+
+OUT=$("$RELAUNCH" spaced 2>&1); RC=$?
+assert_eq "$RC" 0 'relaunch into a worktree path containing a space succeeds'
+wait_for_command "$SESSION:fm-spaced" claude || fail 'relaunch did not bring the harness up in the spaced worktree'
+
+i=0
+while [ "$i" -lt 100 ] && [ ! -s "$SPACED_OUT/gotmp.txt" ]; do sleep 0.1; i=$((i + 1)); done
+assert_eq "$(cat "$SPACED_OUT/cwd.txt" 2>/dev/null)" "$SPACED" \
+  'the relaunched command runs in the recorded worktree even when its path contains a space'
+assert_eq "$(cat "$SPACED_OUT/gotmp.txt" 2>/dev/null)" "$SPACED_TMP/gotmp" \
+  'the relaunched agent inherits the task GOTMPDIR fm-spawn.sh sets at launch'
+assert_eq "$(cat "$SPACED/uncommitted.txt" 2>/dev/null)" 'spaced uncommitted work' \
+  'uncommitted work in a spaced worktree survives the repair'
 
 [ "$FAILED" -eq 0 ] || exit 1
 echo "all fm-crew-fitness tests passed"

@@ -44,9 +44,11 @@
 # It FAILS CLOSED toward unknown and never toward fit: every unreadable target,
 # unsupported backend, missing record, or unattributable process is `unknown`,
 # because a false `fit` is exactly the silent failure this script exists to end.
-# `n/a` is not a failure - it means the recorded launch command granted autonomy
-# by some means other than a recognized flag (pi needs none; opencode uses an env
-# prefix), so there is no flag whose loss could be detected.
+# `n/a` is not a failure - it means the recorded launch command needed no grant
+# at all (pi), so there is nothing whose loss could be detected. A grant that
+# rides an ENV PREFIX rather than a flag is `unknown`, not `n/a`: a restart drops
+# an env prefix exactly as it drops a flag, and no backend can read a running
+# process's environment, so reporting it satisfied would be a false `fit`.
 #
 # Read-only and side-effect free. Exit status: 0 fit, 1 unfit, 3 unknown,
 # 2 usage error. The exit status lets a caller branch without parsing the line.
@@ -82,13 +84,28 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 # Recognized autonomy-granting flags across every verified adapter's launch
 # template in bin/fm-spawn.sh. This list only has to CONTAIN the flags; it never
 # maps harness -> flag, because the flag actually in force is read from the
-# task's own recorded launch command. A harness whose autonomy rides an env
-# prefix (opencode's OPENCODE_CONFIG_CONTENT) or needs no grant at all (pi)
-# simply matches nothing here and reports n/a.
+# task's own recorded launch command. A harness that needs no grant at all (pi)
+# simply matches nothing here.
 AUTONOMY_FLAGS='--dangerously-skip-permissions
 --dangerously-bypass-approvals-and-sandbox
 --always-approve
 --auto'
+
+# Env-prefix names in a recorded launch command that carry a grant the worker
+# cannot work without, and that NO backend can verify: a running process's
+# environment is not readable through any session-provider surface, and argv
+# does not carry it. A restart that rebuilds the launch command drops these
+# exactly as it drops a flag, so their presence caps the autonomy axis at
+# `unknown` rather than letting it read satisfied.
+#
+# Membership is deliberately narrow - only prefixes whose loss leaves the worker
+# unable to do its job. opencode's OPENCODE_CONFIG_CONTENT IS its permission
+# grant, and FM_HOME is what makes a secondmate address its own home rather than
+# its parent's. Prefixes that merely tune a working agent (claude's
+# CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION, pi's FM_PI_HARNESS) are not listed,
+# because condemning every task to `unknown` for them would retire the check.
+AUTONOMY_ENV_GRANTS='OPENCODE_CONFIG_CONTENT
+FM_HOME'
 
 # real_path: physical path, or the input unchanged when it cannot be resolved.
 # Worktree comparison must be physical: a symlinked project or worktree prefix
@@ -98,14 +115,28 @@ real_path() {  # <path>
   ( cd "$1" 2>/dev/null && pwd -P ) || printf '%s' "$1"
 }
 
+# launch_words: the recorded launch command split on whitespace, with NO
+# pathname expansion. `read -ra` rather than an unquoted `for word in $launch`,
+# because a launch command legitimately contains glob characters - opencode's
+# grant is literally OPENCODE_CONFIG_CONTENT='{"permission":{"*":"allow"}}' -
+# and letting the shell expand one against the cwd would silently rewrite the
+# very evidence being examined.
+launch_words() {  # <launch-command>
+  local -a words=()
+  read -ra words <<<"$1"
+  [ "${#words[@]}" -eq 0 ] || printf '%s\n' "${words[@]}"
+}
+
 # launch_autonomy_flags: the recognized autonomy flags present as whitespace-
 # delimited words in <launch>. Word matching (not substring) keeps a longer flag
 # from being reported because a shorter one is its prefix.
 launch_autonomy_flags() {  # <launch-command>
-  local launch=$1 flag word
+  local flag word
+  local -a words=()
+  while IFS= read -r word; do words+=("$word"); done < <(launch_words "$1")
   while IFS= read -r flag; do
     [ -n "$flag" ] || continue
-    for word in $launch; do
+    for word in ${words[@]+"${words[@]}"}; do
       if [ "$word" = "$flag" ]; then
         printf '%s\n' "$flag"
         break
@@ -114,6 +145,28 @@ launch_autonomy_flags() {  # <launch-command>
   done <<EOF
 $AUTONOMY_FLAGS
 EOF
+}
+
+# launch_env_grants: the names of the unverifiable env-prefix grants that
+# <launch> carries. Only the LEADING assignment words are considered, because
+# only those are env prefixes of the command itself; a `NAME=value` appearing
+# later is an argument to the harness, not part of its environment.
+launch_env_grants() {  # <launch-command>
+  local word name grant
+  local -a words=()
+  while IFS= read -r word; do words+=("$word"); done < <(launch_words "$1")
+  for word in ${words[@]+"${words[@]}"}; do
+    case "$word" in
+      [A-Za-z_]*=*) name=${word%%=*} ;;
+      *) break ;;
+    esac
+    while IFS= read -r grant; do
+      [ -n "$grant" ] || continue
+      [ "$name" = "$grant" ] && printf '%s\n' "$name"
+    done <<EOF
+$AUTONOMY_ENV_GRANTS
+EOF
+  done
 }
 
 report() {  # <verdict> <autonomy> <cwd> [detail]
@@ -178,14 +231,17 @@ check_one() {  # <task-id>
     # and guessing them per harness is exactly the drift this design avoids.
     detail="no launch command recorded (spawned before this was tracked); deterministic relaunch is unavailable for this task"
   else
-    local -a want=()
+    local -a want=() env_grants=()
     while IFS= read -r flag; do
       [ -n "$flag" ] || continue
       want+=("$flag")
     done < <(launch_autonomy_flags "$launch")
+    while IFS= read -r flag; do
+      [ -n "$flag" ] || continue
+      env_grants+=("$flag")
+    done < <(launch_env_grants "$launch")
     if [ "${#want[@]}" -eq 0 ]; then
-      # The recorded launch grants autonomy by some means other than a
-      # recognized flag, so no flag exists whose loss could be detected.
+      # The recorded launch carries no flag whose loss could be detected.
       autonomy=n/a
     else
       autonomy=ok
@@ -201,13 +257,26 @@ check_one() {  # <task-id>
         esac
       done
     fi
+    # An unverifiable env-prefix grant caps the axis. It can never CLEAR a
+    # proven loss, only refuse to call the axis satisfied - which is the whole
+    # point, because a restart drops an env prefix exactly as it drops a flag.
+    if [ "${#env_grants[@]}" -gt 0 ] && [ "$autonomy" != lost ]; then
+      autonomy=unknown
+      detail="the recorded launch grants autonomy through the env prefix ${env_grants[*]}, which no backend can read from a running process; verify it by hand or relaunch"
+    fi
   fi
 
   # --- worktree axis --------------------------------------------------------
+  # PASSIVE read only. This runs against a pane that is expected to be running
+  # an agent, so the cwd must come from data the backend already holds. The
+  # general fm_backend_current_path is not usable here: on zellij and cmux it
+  # types a marked `pwd` into the pane, which in a live agent's composer would
+  # submit a bogus prompt - and this script promises to be side-effect free.
+  # Those backends therefore report cwd=unknown, never a guess.
   if [ -z "$worktree" ]; then
     cwd=unknown
   else
-    live=$(fm_backend_current_path "$backend" "$target" "$window" 2>/dev/null || true)
+    live=$(fm_backend_current_path_passive "$backend" "$target" 2>/dev/null || true)
     if [ -z "$live" ]; then
       cwd=unknown
     else

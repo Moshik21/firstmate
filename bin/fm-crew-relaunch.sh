@@ -15,10 +15,16 @@
 # then run this.
 #
 # SAFETY - this script refuses rather than risking the task:
-#   * It NEVER relaunches over a live agent. Only the recovery-grade `dead` and
-#     `missing` endpoint states license a relaunch; `alive`, `ambiguous`,
-#     `unreadable`, and `unverified` all refuse, so two agents can never end up
-#     owning one task. Exit the agent first - do not force past this.
+#   * It NEVER relaunches over a live agent. Only the recovery-grade `dead`
+#     endpoint state licenses a relaunch - a pane that still exists but has
+#     fallen back to its shell. `alive`, `ambiguous`, `unreadable`, and
+#     `unverified` all refuse, so two agents can never end up owning one task.
+#     Exit the agent first - do not force past this.
+#   * It NEVER pretends to repair a vanished endpoint. `missing` means the
+#     recorded pane is authoritatively gone, so there is nothing to relaunch
+#     INTO: that is a respawn, which owns worktree and endpoint allocation and
+#     is not this script's job. It refuses before touching anything, so a
+#     refusal never leaves a half-applied repair behind.
 #   * It NEVER allocates a worktree. It relaunches into the recorded worktree or
 #     it refuses, because allocating a second worktree for a task whose first one
 #     is unaccounted for is how one task becomes two diverging copies.
@@ -43,8 +49,10 @@ proving no live agent still owns it.
                  (default: a generic interrupted-and-resumed note)
   --dry-run      print what would be sent and exit without sending or writing
 
-Refuses unless the recorded endpoint is dead or missing: exit the agent with its
-adapter's exit command first (see the harness-adapters skill).
+Refuses unless the recorded endpoint is dead - present, but with no agent left
+running in it. Exit the agent with its adapter's exit command first (see the
+harness-adapters skill). An endpoint that is gone entirely needs a respawn, not
+a relaunch.
 EOF
 }
 
@@ -101,24 +109,54 @@ TOP_REAL=$( cd "$WT_TOP" && pwd -P )
 # --- no live agent may still own this task -----------------------------------
 AGENT_STATE=$(fm_backend_agent_state "$BACKEND" "$TARGET")
 case "$AGENT_STATE" in
-  dead|missing) ;;
+  dead) ;;
   alive)
     die "an agent is still running in task '$ID''s pane; exit it with its adapter's exit command first (harness-adapters skill), then re-run - relaunching over a live agent would put two agents on one task"
     ;;
+  missing)
+    die "task '$ID''s recorded endpoint $TARGET no longer exists, so there is nothing to relaunch into; this is a respawn, not a relaunch - its worktree at $WORKTREE is untouched, so recover it through the stuck-crewmate-recovery playbook"
+    ;;
   *)
-    die "cannot confirm task '$ID''s pane is free (endpoint state: $AGENT_STATE); refusing to relaunch until it reads dead or missing"
+    die "cannot confirm task '$ID''s pane is free (endpoint state: $AGENT_STATE); refusing to relaunch until it reads dead"
     ;;
 esac
 
 BRIEF="$DATA/$ID/brief.md"
 [ -n "$NOTE" ] || NOTE="This session was interrupted and relaunched in place. Your worktree, its commits, and its uncommitted changes are exactly as you left them. Inspect the worktree first and continue from that state - do not restart the task from the beginning."
 
+# Everything sent below is typed into a shell, so every recorded path must be
+# shell-quoted. A worktree path holding a space or a glob character would
+# otherwise `cd` somewhere else entirely and the launch command would land in
+# the wrong directory while this script reported success - reproducing the exact
+# failure it exists to repair.
+printf -v CD_CMD 'cd %q' "$WORKTREE"
+
+# The pane shell is fresh after a restart, so the env fm-spawn.sh established
+# around the original launch is gone with it. GOTMPDIR is the one piece the
+# agent and every child process it starts inherit, and the task's own tmp root
+# is already recorded, so replay it exactly as fm-spawn.sh does.
+TASKTMP=$(fm_meta_get "$META" tasktmp)
+GOTMP_CMD=
+[ -z "$TASKTMP" ] || printf -v GOTMP_CMD 'export GOTMPDIR=%q' "$TASKTMP/gotmp"
+
+# The task LABEL, not the recorded target string: zellij and cmux verify the
+# tab/workspace title against this before sending. It is the same value
+# fm-spawn.sh sends every spawn-time line with.
+LABEL="fm-$ID"
+
 if [ "$DRY_RUN" -eq 1 ]; then
   printf 'would append recovery note to: %s\n' "$BRIEF"
   printf 'would cd pane %s (backend=%s) to: %s\n' "$TARGET" "$BACKEND" "$WORKTREE"
+  if [ -n "$GOTMP_CMD" ]; then
+    printf 'would send env: %s\n' "$GOTMP_CMD"
+  else
+    printf 'would send no GOTMPDIR export: task has no recorded tasktmp\n'
+  fi
   printf 'would send launch: %s\n' "$LAUNCH"
   exit 0
 fi
+
+[ -n "$GOTMP_CMD" ] || printf 'warning: task %s has no recorded tasktmp; relaunching without the GOTMPDIR export fm-spawn.sh normally sets\n' "$ID" >&2
 
 # Append the recovery note BEFORE relaunching: the launch command re-reads the
 # brief from disk, so a note written afterwards would be invisible to the agent
@@ -136,10 +174,15 @@ fi
 # effect - it is the same string fm-spawn.sh sent once the pane was already
 # inside the worktree - so sending it from the wrong directory is what produced
 # the failure this script repairs.
-fm_backend_send_text_line "$BACKEND" "$TARGET" "cd $WORKTREE" "$WINDOW" \
+fm_backend_send_text_line "$BACKEND" "$TARGET" "$CD_CMD" "$LABEL" \
   || die "could not send the directory change to task '$ID''s pane"
 sleep 0.3
-fm_backend_send_text_line "$BACKEND" "$TARGET" "$LAUNCH" "$WINDOW" \
+if [ -n "$GOTMP_CMD" ]; then
+  fm_backend_send_text_line "$BACKEND" "$TARGET" "$GOTMP_CMD" "$LABEL" \
+    || die "could not send the GOTMPDIR export to task '$ID''s pane"
+  sleep 0.3
+fi
+fm_backend_send_text_line "$BACKEND" "$TARGET" "$LAUNCH" "$LABEL" \
   || die "could not send the launch command to task '$ID''s pane"
 
 printf 'relaunched %s harness=%s backend=%s worktree=%s\n' \

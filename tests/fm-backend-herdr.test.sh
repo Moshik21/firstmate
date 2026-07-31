@@ -1829,6 +1829,117 @@ test_current_path_reads_cwd() {
   pass "fm_backend_herdr_current_path: reads pane foreground_cwd (the live running process), not the frozen creation-time cwd"
 }
 
+# --- pane_argv_has (three-state exact argv-element read) ---------------------
+#
+# The canned responses below reproduce the shape `herdr pane process-info`
+# actually returns, verified read-only against herdr 0.7.5 protocol 17 on
+# 2026-07-31 and recorded in docs/verification/runtime-backends.md "Foreground
+# argv": the envelope is `.result.process_info`, `foreground_processes[].argv`
+# is an array of strings or null, and `cmdline` is a separate flattened string
+# the adapter must never fall back to.
+#
+# What these cases prove is the adapter's own contract - present / confidently
+# absent / undeterminable - against that shape. They cannot prove herdr still
+# returns it; that is what the recorded verification evidence is for.
+
+# herdr_process_info: one canned pane process-info response. Each argument is a
+# whole argv element of a single foreground process.
+herdr_process_info() {  # <argv-element>...
+  local first=1 e
+  printf '{"id":"cli:pane:process_info","result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":5138,"foreground_process_group_id":5221,"foreground_processes":[{"pid":5221,"name":"claude","cmdline":"'
+  for e in "$@"; do
+    [ "$first" -eq 1 ] || printf ' '
+    first=0
+    printf '%s' "$e"
+  done
+  printf '","argv":'
+  printf '%s\n' "$@" | jq -R . | jq -sc .
+  printf '}]}}}\n'
+}
+
+test_pane_argv_has_finds_an_exact_element() {
+  local dir log resp fb status
+  dir="$TMP_ROOT/argv-present"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  herdr_process_info claude --dangerously-skip-permissions --model opus > "$resp/1.out"
+  fb=$(make_herdr_fakebin "$dir")
+  PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_pane_argv_has default:w1:p2 --dangerously-skip-permissions' "$ROOT"
+  status=$?
+  expect_code 0 "$status" "an argv element that is present must report 0"
+  assert_contains "$(cat "$log")" $'\x1f''pane'$'\x1f''process-info'$'\x1f''--pane'$'\x1f''w1:p2' \
+    "pane_argv_has did not read the requested pane's process info"
+  pass "fm_backend_herdr_pane_argv_has: a flag present as its own argv element reports present"
+}
+
+test_pane_argv_has_reports_a_stripped_flag_absent() {
+  local dir log resp fb status
+  dir="$TMP_ROOT/argv-absent"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  # The exact shape a herdr restart leaves behind: the agent relaunched from the
+  # integration-reported session ref, carrying none of firstmate's launch shape.
+  herdr_process_info claude --resume 21637ebd-8ca7-41bc-9c3b-1b8079c08ed0 > "$resp/1.out"
+  fb=$(make_herdr_fakebin "$dir")
+  PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_pane_argv_has default:w1:p2 --dangerously-skip-permissions' "$ROOT"
+  status=$?
+  expect_code 1 "$status" "a stripped autonomy flag must report confidently absent"
+  pass "fm_backend_herdr_pane_argv_has: an autonomy flag stripped by a resume reports confidently absent"
+}
+
+test_pane_argv_has_does_not_match_inside_an_element() {
+  local dir log resp fb status
+  dir="$TMP_ROOT/argv-quoted"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  # A crewmate's whole brief travels as one argv element, and a brief can quote
+  # the very flag being looked for. Only whole-element equality is correct.
+  herdr_process_info claude --resume abc123 \
+    'the restored process no longer carried --dangerously-skip-permissions, so it stalls' > "$resp/1.out"
+  fb=$(make_herdr_fakebin "$dir")
+  PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_pane_argv_has default:w1:p2 --dangerously-skip-permissions' "$ROOT"
+  status=$?
+  expect_code 1 "$status" "a brief that merely quotes the flag must not count as the flag"
+  pass "fm_backend_herdr_pane_argv_has: a brief quoting the flag is not mistaken for the flag itself"
+}
+
+test_pane_argv_has_is_undeterminable_without_an_attributed_process() {
+  local dir log resp fb status
+  dir="$TMP_ROOT/argv-noproc"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  # No foreground process attributed yet. Reporting "absent" here would condemn
+  # a healthy pane, so the contract requires 2 (undeterminable).
+  printf '{"id":"cli:pane:process_info","result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_processes":[]}}}\n' > "$resp/1.out"
+  fb=$(make_herdr_fakebin "$dir")
+  PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_pane_argv_has default:w1:p2 --dangerously-skip-permissions' "$ROOT"
+  status=$?
+  expect_code 2 "$status" "an empty foreground process list must be undeterminable, never proof of absence"
+  pass "fm_backend_herdr_pane_argv_has: no attributable foreground process is undeterminable, not absent"
+}
+
+test_pane_argv_has_is_undeterminable_on_a_null_argv() {
+  local dir log resp fb status
+  dir="$TMP_ROOT/argv-null"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  # herdr's schema declares argv nullable. A null argv carries no element
+  # boundaries at all, and cmdline is not a substitute, so it cannot answer.
+  printf '{"id":"cli:pane:process_info","result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","foreground_processes":[{"pid":5221,"name":"claude","cmdline":"claude --dangerously-skip-permissions","argv":null}]}}}\n' > "$resp/1.out"
+  fb=$(make_herdr_fakebin "$dir")
+  PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_pane_argv_has default:w1:p2 --dangerously-skip-permissions' "$ROOT"
+  status=$?
+  expect_code 2 "$status" "a null argv must be undeterminable and must never fall back to the flattened cmdline"
+  pass "fm_backend_herdr_pane_argv_has: a null argv is undeterminable and never falls back to cmdline"
+}
+
+test_pane_argv_has_is_undeterminable_when_the_read_fails() {
+  local dir log resp fb status
+  dir="$TMP_ROOT/argv-fail"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  printf '1\n' > "$resp/1.exit"
+  fb=$(make_herdr_fakebin "$dir")
+  PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_pane_argv_has default:w1:p2 --dangerously-skip-permissions' "$ROOT"
+  status=$?
+  expect_code 2 "$status" "a failed process-info read must be undeterminable"
+  pass "fm_backend_herdr_pane_argv_has: a failed read is undeterminable, never a verdict"
+}
+
 # --- busy_state (semantic agent state) ---------------------------------------
 
 test_busy_state_working_maps_to_busy() {
@@ -3164,6 +3275,12 @@ test_capture_preserves_pane_read_failure
 test_send_key_normalizes_and_targets_pane
 test_kill_is_best_effort
 test_current_path_reads_cwd
+test_pane_argv_has_finds_an_exact_element
+test_pane_argv_has_reports_a_stripped_flag_absent
+test_pane_argv_has_does_not_match_inside_an_element
+test_pane_argv_has_is_undeterminable_without_an_attributed_process
+test_pane_argv_has_is_undeterminable_on_a_null_argv
+test_pane_argv_has_is_undeterminable_when_the_read_fails
 test_busy_state_working_maps_to_busy
 test_busy_state_done_and_blocked_map_to_idle
 test_busy_state_unknown_on_no_agent

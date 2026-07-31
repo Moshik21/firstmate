@@ -150,9 +150,34 @@ The CLI matrix was checked directly:
 | Native state | `herdr agent get <pane>` | Working and done transitions were visible; native `busy` remains positive activity evidence, while native `idle` cannot close a turn and the adapter's semantic lifecycle decides worker state. |
 | Restart | guarded named-session stop then start | Workspace, tab, pane, and labels persisted; the agent process and registration did not. |
 | Close | `herdr pane close <pane> --session <name>` | The exact one-pane task tab closed; closing a final tab could remove the workspace. |
+| Foreground argv | `herdr pane process-info --pane <id> --session <name>` | Reported the pane's live foreground processes with `argv` as a real JSON array, so whole-element matching is possible; see "Foreground argv" below. |
 
 All destructive verification used `bin/fm-herdr-lab.sh` with a non-default `fm-lab-` name and a byte-identical default-session tripwire.
 No ambient `herdr server stop` command is a supported test operation.
+
+### Foreground argv
+
+`fm_backend_herdr_pane_argv_has` answers whether an exact argv element is still in force in a live pane, which is what `bin/fm-crew-fitness.sh` reads to detect a worker that came back from a restart without its autonomy flag.
+The claim it rests on is that `pane process-info` reports argv as a real array, because substring matching over a flattened command line could not tell a real flag apart from a brief that merely quotes one.
+
+Verified read-only against herdr 0.7.5, protocol 17, on 2026-07-31, with the schema and two live panes of the captain's own default session:
+
+```sh
+herdr api schema --json | jq -c '.schemas.success_response["$defs"].PaneProcessInfoProcess'
+herdr pane process-info --pane <id>
+```
+
+```text
+{"properties":{"argv":{"items":{"type":"string"},"type":["array","null"]},"argv0":{"type":["string","null"]},"cmdline":{"type":["string","null"]},"cwd":{"type":["string","null"]},"name":{"type":"string"},"pid":{"format":"uint32","minimum":0,"type":"integer"}},"required":["pid","name"],"type":"object"}
+{"id":"cli:pane:process_info","result":{"process_info":{"foreground_process_group_id":5221,"foreground_processes":[{"argv":["claude","--resume","21637ebd-8ca7-41bc-9c3b-1b8079c08ed0"],"cmdline":"claude --resume 21637ebd-8ca7-41bc-9c3b-1b8079c08ed0","cwd":"...","name":"claude","pid":5221}],"pane_id":"wK:p1","shell_pid":5138},"type":"pane_process_info"}}
+```
+
+The response envelope is `.result.process_info`, `foreground_processes[].argv` is an array of strings or null, and `argv` is nullable while `cmdline` is a flattened string, which is why the adapter reads the array and never the string.
+The second live pane was a firstmate crewmate launched with the full autonomy shape, whose argv carried `--dangerously-skip-permissions` as its own element alongside the whole encoded brief as a single further element.
+Running the adapter's own predicate `any(.result.process_info.foreground_processes[]?.argv[]?; . == $want)` against that pair returned true for the autonomous pane and false for the `claude --resume` pane, which is exactly the restart failure shape the check exists to catch.
+
+The three-state contract itself is exercised deterministically against this schema in `tests/fm-backend-herdr.test.sh`.
+The adapter function has not been driven end to end against a live herdr pane inside a lab session, so the evidence above is a read-only schema and output verification rather than a full E2E run.
 
 ### Prune and respawn
 

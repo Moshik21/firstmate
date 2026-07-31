@@ -34,7 +34,8 @@ Repair an `unfit` worker in this order.
 3. Confirm with `bin/fm-crew-fitness.sh <id>` that the pane reads `fit` again.
 
 A refusal from that script is a stop-and-investigate result.
-It refuses when an agent still owns the task, when the recorded worktree is gone or is no longer its own checkout, or when no launch command was recorded, and it never allocates a replacement worktree.
+It refuses when an agent still owns the task, when the recorded worktree is gone or is no longer its own checkout, and when no launch command was recorded, and it never allocates a replacement worktree.
+It also refuses when the recorded endpoint is gone entirely rather than merely idle, because there is then no pane to relaunch into: that case is a respawn, which the dead-direct-report procedure below owns, and it refuses before writing anything so a refusal never leaves a half-applied repair behind.
 `unknown` is not `unfit`: it means the check could not establish an answer, so inspect the pane before acting rather than relaunching on it.
 Interrupting the harness cannot restore autonomy that was never granted at launch, so never try to fix an `unfit` pane with a keystroke; `harness-adapters` owns why.
 

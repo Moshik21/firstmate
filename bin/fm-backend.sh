@@ -727,7 +727,12 @@ fm_backend_send_key() {  # <backend> <target> <key> [expected-label]
 # a recovery `cd` plus relaunch), never for talking to a running agent. Use
 # fm_backend_send_text_submit for anything that must prove it landed in an
 # agent's composer.
-fm_backend_send_text_line() {  # <backend> <target> <text> [session]
+#
+# The 4th argument is the task's LABEL (`fm-<id>`), never a session name or a
+# recorded target string: zellij and cmux verify the tab/workspace title against
+# it before sending, so passing anything else makes every send on those two
+# backends fail.
+fm_backend_send_text_line() {  # <backend> <target> <text> [expected-label]
   local backend=$1
   shift
   fm_backend_source "$backend" || return 1
@@ -894,14 +899,45 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
 # deliberately track the foreground process rather than the pane's creation-time
 # cwd, because a firstmate crewmate reaches its worktree through a `treehouse
 # get` subshell that the creation-time value never follows.
-fm_backend_current_path() {  # <backend> <target> [session]
-  local backend=$1 target=$2 session=${3:-}
+#
+# NOT side-effect free on every backend. zellij and cmux expose no live-process
+# cwd field at all, so their readers ACTIVELY PROBE: they type a marked `pwd`
+# into the pane and read it back. That is only acceptable at a pane's shell
+# prompt before any harness is launched, which is why this op is scoped to
+# fm-spawn.sh's pre-launch worktree poll. Anything reading the cwd of a pane
+# that may already be running an agent must call fm_backend_current_path_passive
+# instead - typing into a live agent's composer would submit a bogus prompt.
+#
+# The 4th argument is the task's LABEL (`fm-<id>`), which zellij and cmux verify
+# the tab/workspace title against before probing.
+fm_backend_current_path() {  # <backend> <target> [expected-label]
+  local backend=$1 target=$2 label=${3:-}
   fm_backend_source "$backend" || return 0
   case "$backend" in
     tmux) fm_backend_tmux_current_path "$target" ;;
     herdr) fm_backend_herdr_current_path "$target" ;;
-    zellij) fm_backend_zellij_current_path "$target" "$session" ;;
-    cmux) fm_backend_cmux_current_path "$target" "$session" ;;
+    zellij) fm_backend_zellij_current_path "$target" "$label" ;;
+    cmux) fm_backend_cmux_current_path "$target" "$label" ;;
+    *) return 0 ;;
+  esac
+}
+
+# fm_backend_current_path_passive: the same live foreground working directory,
+# but ONLY from backends that can report it without sending anything into the
+# pane. Empty means "no passive reader here", never "the pane has no cwd", so a
+# caller must treat empty as unknown rather than as a mismatch.
+#
+# This is the reader for any pane that may already be running an agent. It
+# supports exactly the backends that expose a live-process cwd as data - tmux's
+# `#{pane_current_path}` and herdr's `.result.pane.foreground_cwd` - which is
+# the same split as fm_backend_pane_argv_has, for the same reason: an answer
+# that costs a keystroke in a live composer is not an answer worth having.
+fm_backend_current_path_passive() {  # <backend> <target>
+  local backend=$1 target=$2
+  fm_backend_source "$backend" || return 0
+  case "$backend" in
+    tmux) fm_backend_tmux_current_path "$target" ;;
+    herdr) fm_backend_herdr_current_path "$target" ;;
     *) return 0 ;;
   esac
 }

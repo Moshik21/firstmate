@@ -500,6 +500,14 @@ launch_template() {
 
 case "$ARG3" in
   *' '*)  # raw launch command (unverified-adapter escape hatch)
+    # A launch command is one command line. A newline in this caller-supplied
+    # string could neither be typed into the pane as one command nor recorded as
+    # one launch= line: it would write extra lines into state/<id>.meta, and
+    # fm_meta_get's tail -1 would then prefer an injected trailing worktree= or
+    # window= over the genuine one for every consumer, teardown included.
+    case "$ARG3" in
+      *$'\n'*) echo "error: the raw launch command contains a newline; a launch command must be a single command line" >&2; exit 1 ;;
+    esac
     LAUNCH=$ARG3
     HARNESS=""
     for word in $LAUNCH; do
@@ -1681,8 +1689,17 @@ fi
 # actually launched with. Appended rather than folded into the block above
 # because the launch string is not fully resolved until here, matching how
 # fm-pr-check and fm-x-link already extend a task's metadata after the fact.
-# One line, no newlines: every launch template is a single command line.
-printf 'launch=%s\n' "$LAUNCH" >> "$STATE/$ID.meta"
+# Exactly one line. A launch string carrying a newline - a raw launch command is
+# rejected for it above, but a substituted path could still hold one - would
+# write extra lines here, and fm_meta_get's tail -1 would then prefer an
+# injected trailing worktree= or window= over the genuine one for every
+# consumer, teardown included. Corrupting the record is worse than not having
+# it: recording nothing leaves fitness reading unknown and relaunch refusing,
+# which is where both already fail closed.
+case "$LAUNCH" in
+  *$'\n'*) echo "warning: the resolved launch command contains a newline; not recording launch= for $ID (deterministic relaunch will be unavailable for this task)" >&2 ;;
+  *) printf 'launch=%s\n' "$LAUNCH" >> "$STATE/$ID.meta" ;;
+esac
 
 # Export GOTMPDIR into the crewmate's pane shell so the agent and every child
 # process (go build, go test, ...) inherit it. Sent before the launch command so
