@@ -207,6 +207,28 @@ fm_pr_url_parse() {
   FM_PR_NUMBER=${BASH_REMATCH[3]}
 }
 
+# First PR/MR URL recorded anywhere in a text file - typically a task's
+# append-only status stream, whose own shipped event reads
+# `done: PR <url> checks green` long before an explicit bin/fm-pr-check.sh
+# invocation records meta `pr=`. Candidates are extracted permissively (the
+# trailing `[0-9]+` ends the match at the number, so surrounding prose and
+# punctuation are excluded) and then accepted only when fm_pr_url_parse
+# validates them. This file already owns the single definition of a recorded
+# PR/MR identity, so every surface that reads a status stream recognizes exactly
+# the provider set bin/fm-pr-check.sh records - a GitHub pull URL, or a GitLab
+# merge-request URL on any (including self-hosted) instance - instead of each
+# carrying its own forge-specific pattern.
+fm_pr_first_url_in_file() {  # <file>
+  local file=${1-} candidate
+  [ -n "$file" ] && [ -f "$file" ] || return 1
+  while IFS= read -r candidate; do
+    fm_pr_url_parse "$candidate" || continue
+    printf '%s\n' "$FM_PR_URL"
+    return 0
+  done < <(grep -Eo 'https?://[^[:space:]<>")]+/(pull|-/merge_requests)/[0-9]+' "$file" 2>/dev/null)
+  return 1
+}
+
 fm_pr_head_valid() {
   local head=${1-}
   local LC_ALL=C

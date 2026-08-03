@@ -28,9 +28,10 @@
 #   (l) committed no-mistakes implementation awaiting firstmate's validation
 #       trigger is distinct from done, without affecting other modes, scouts,
 #       tasks with an attributable run, tasks with a PR recorded in meta or in
-#       their own status stream, busy workers, dead workers, or an unavailable
-#       validation-state lookup - while a determinate no-run answer that exits
-#       non-zero still counts as an answer.
+#       their own status stream (GitHub or GitLab), busy workers, dead workers,
+#       or an unavailable validation-state lookup - while a determinate no-run
+#       answer still counts as an answer whichever stream it lands on and
+#       whatever it exits.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -63,20 +64,29 @@ make_repo_on_branch() {  # <dir> <branch>
 # runs --limit N`, which is plain text - no run id, no quoting - serving
 # FM_FAKE_RUNS_LIST verbatim.
 #
-# Two knobs drive the helper's determinate-vs-unavailable classification, which
-# the real CLI does not express through its exit code alone:
+# These knobs drive the helper's determinate-vs-unavailable classification, which
+# the real CLI expresses through neither its exit code nor a single stream. The
+# two subcommands genuinely differ (verified against the real CLI in an un-gated
+# repo): `axi status` answers on stdout with rc=1, `runs` answers on stderr with
+# rc=1 and an empty stdout - so each gets its own failure knobs.
 #   FM_FAKE_NM_RC=<n>        exit code for an answer that still reached stdout
 #                            (the real `axi status` prints `No active run.` /
 #                            `error: repo not initialized` and exits non-zero)
 #   FM_FAKE_NM_UNAVAILABLE=1 the lookup never lands: nothing on stdout, non-zero
-#                            exit (a crashed CLI, or 124 for a timeout kill)
+#                            exit (a crashed CLI, or 124 for a timeout kill),
+#                            optionally with FM_FAKE_NM_STDERR on stderr
+#   FM_FAKE_RUNS_STDERR      `runs` answers on stderr only, exiting
+#                            FM_FAKE_RUNS_RC (default 1) with an empty stdout
 make_fakebin() {  # <dir> -> echoes fakebin path
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
   cat > "$fb/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 set -u
-[ "${FM_FAKE_NM_UNAVAILABLE:-0}" = 1 ] && exit "${FM_FAKE_NM_RC:-124}"
+if [ "${FM_FAKE_NM_UNAVAILABLE:-0}" = 1 ]; then
+  [ -n "${FM_FAKE_NM_STDERR:-}" ] && printf '%s\n' "$FM_FAKE_NM_STDERR" >&2
+  exit "${FM_FAKE_NM_RC:-124}"
+fi
 case "${1:-}" in
   axi)
     shift
@@ -90,6 +100,10 @@ case "${1:-}" in
     esac
     ;;
   runs)
+    if [ -n "${FM_FAKE_RUNS_STDERR:-}" ]; then
+      printf '%s\n' "$FM_FAKE_RUNS_STDERR" >&2
+      exit "${FM_FAKE_RUNS_RC:-1}"
+    fi
     printf '%s\n' "${FM_FAKE_RUNS_LIST:-}" ;;
 esac
 exit "${FM_FAKE_NM_RC:-0}"
@@ -187,9 +201,12 @@ reset_fakes() {
   FM_FAKE_CI_LOGS=""
   FM_FAKE_NM_RC=0
   FM_FAKE_NM_UNAVAILABLE=0
+  FM_FAKE_NM_STDERR=""
+  FM_FAKE_RUNS_STDERR=""
+  FM_FAKE_RUNS_RC=1
   export FM_FAKE_AXI_STATUS FM_FAKE_AXI_STATUS_RUN FM_FAKE_RUNS_LIST FM_FAKE_BUSY FM_FAKE_BUSY_TEXT FM_FAKE_TMUX_MISSING
   export FM_FAKE_HERDR_BUSY FM_FAKE_HERDR_MISSING FM_FAKE_HERDR_AGENT_STATUS FM_FAKE_CI_LOGS
-  export FM_FAKE_NM_RC FM_FAKE_NM_UNAVAILABLE
+  export FM_FAKE_NM_RC FM_FAKE_NM_UNAVAILABLE FM_FAKE_NM_STDERR FM_FAKE_RUNS_STDERR FM_FAKE_RUNS_RC
 }
 
 # --- run-object fixtures (TOON, as `no-mistakes axi status` emits) -----------
@@ -1021,6 +1038,79 @@ test_dead_worker_does_not_await_validation_trigger() {
   pass "a dead no-mistakes worker never reports a pending validation trigger"
 }
 
+# An un-gated repo is the sharpest form of the flagship case: the worker
+# implemented, committed and reported done without ever initializing the gate.
+# `runs` answers that on stderr with an empty stdout (verified against the real
+# CLI), which is still an answer and must not read as an unavailable lookup.
+test_no_run_answer_on_stderr_awaits_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case no-run-answer-on-stderr)
+  make_repo_on_branch "$d/wt" fm/no-run-answer-on-stderr
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/no-run-answer-on-stderr.meta" \
+    "window=fm:fm-no-run-answer-on-stderr" "worktree=$d/wt" "kind=ship" \
+    "mode=no-mistakes" "harness=claude"
+  printf 'done: implementation committed on the task branch\n' > "$d/state/no-run-answer-on-stderr.status"
+  FM_FAKE_AXI_STATUS="error: repo not initialized (run 'no-mistakes init' first)"
+  FM_FAKE_NM_RC=1
+  FM_FAKE_RUNS_STDERR="repo not initialized (run 'no-mistakes init' first)"
+  FM_FAKE_RUNS_RC=1
+  arm_idle_record "$d/state" no-run-answer-on-stderr
+  local out; out=$(run_crew_state "$d" no-run-answer-on-stderr)
+  assert_contains "$out" "state: awaiting-validation-trigger" \
+    "a no-run answer delivered on stderr must still expose firstmate's pending trigger"
+  assert_not_contains "$out" "state: done" "a never-validated implementation is not lifecycle-complete"
+  pass "a no-run answer delivered only on stderr still exposes the pending trigger"
+}
+
+# The stderr arm is an allowlist of no-run ANSWERS, not "stderr counts as an
+# answer": a transport failure says nothing about whether a run exists, so it
+# must stay unavailable and never manufacture a pending trigger.
+test_transport_failure_on_stderr_does_not_await_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case transport-failure-on-stderr)
+  make_repo_on_branch "$d/wt" fm/transport-failure-on-stderr
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/transport-failure-on-stderr.meta" \
+    "window=fm:fm-transport-failure-on-stderr" "worktree=$d/wt" "kind=ship" \
+    "mode=no-mistakes" "harness=claude"
+  printf 'done: implementation committed on the task branch\n' > "$d/state/transport-failure-on-stderr.status"
+  FM_FAKE_AXI_STATUS="No active run. Push through the gate to start a pipeline:"
+  FM_FAKE_NM_RC=1
+  FM_FAKE_RUNS_STDERR="connect to daemon: dial unix /run/no-mistakes.sock: connect: connection refused"
+  FM_FAKE_RUNS_RC=1
+  arm_idle_record "$d/state" transport-failure-on-stderr
+  local out; out=$(run_crew_state "$d" transport-failure-on-stderr)
+  assert_not_contains "$out" "awaiting-validation-trigger" \
+    "a transport failure is not an answer and must not assert a pending trigger"
+  assert_contains "$out" "state: done" "an unavailable lookup falls back to the status-log verb"
+  pass "a transport failure on stderr stays an unavailable lookup"
+}
+
+# A GitLab merge request is a first-class recorded PR here (bin/fm-pr-lib.sh
+# fm_pr_url_parse, and bin/fm-pr-check.sh records exactly those URLs), so a ship
+# that already shipped to a non-GitHub forge must not be re-reported as needing
+# a validation trigger.
+test_gitlab_status_log_pr_does_not_await_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case gitlab-pr-no-trigger)
+  make_repo_on_branch "$d/wt" fm/gitlab-pr-no-trigger
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/gitlab-pr-no-trigger.meta" \
+    "window=fm:fm-gitlab-pr-no-trigger" "worktree=$d/wt" "kind=ship" \
+    "mode=no-mistakes" "harness=claude"
+  printf 'done: PR https://gitlab.example.com/grp/proj/-/merge_requests/9 checks green\n' \
+    > "$d/state/gitlab-pr-no-trigger.status"
+  FM_FAKE_AXI_STATUS=""
+  FM_FAKE_RUNS_LIST=""
+  arm_idle_record "$d/state" gitlab-pr-no-trigger
+  local out; out=$(run_crew_state "$d" gitlab-pr-no-trigger)
+  assert_contains "$out" "state: done" "a GitLab merge request keeps the shipped task done"
+  assert_not_contains "$out" "awaiting-validation-trigger" \
+    "a recorded merge request closes the pre-validation handoff like a GitHub PR"
+  pass "a GitLab merge request in the status stream suppresses the pending-trigger state"
+}
+
 # (f) no run for this crew + a busy pane -> working via pane
 test_no_run_busy_pane() {
   reset_fakes
@@ -1581,6 +1671,9 @@ test_determinate_no_run_answer_with_nonzero_exit_awaits_validation_trigger
 test_unavailable_validation_lookup_does_not_await_validation_trigger
 test_busy_worker_does_not_await_validation_trigger
 test_dead_worker_does_not_await_validation_trigger
+test_no_run_answer_on_stderr_awaits_validation_trigger
+test_transport_failure_on_stderr_does_not_await_validation_trigger
+test_gitlab_status_log_pr_does_not_await_validation_trigger
 test_no_run_busy_pane
 test_no_run_footer_text_alone_is_not_working
 test_no_run_grok_uses_isolated_fallback

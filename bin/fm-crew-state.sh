@@ -67,6 +67,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-classify-lib.sh"
 # shellcheck source=bin/fm-busy-lib.sh
 . "$SCRIPT_DIR/fm-busy-lib.sh"
+# shellcheck source=bin/fm-pr-lib.sh
+. "$SCRIPT_DIR/fm-pr-lib.sh"  # fm_pr_first_url_in_file: the one recorded-PR recognizer
 
 ID=${1:-}
 [ -n "$ID" ] || { echo "usage: fm-crew-state.sh <id>" >&2; exit 2; }
@@ -145,11 +147,12 @@ LOG_VERB=$(status_line_verb "$LOG_LINE")
 # `pr=` alone is not that proof: it is written only by the explicit
 # bin/fm-pr-check.sh firstmate action, so a ship that already shipped carries its
 # PR only in its own status stream (`done: PR <url> checks green`) until firstmate
-# records it. Read the stream with the same pattern the fleet snapshot uses
-# (bin/fm-fleet-snapshot.sh first_pr_url_in_file) so both surfaces agree on what
-# counts as a recorded PR.
-if [ -z "$PR" ] && [ -f "$LOG" ]; then
-  PR=$(grep -Eo 'https?://[^[:space:])"]+/pull/[0-9]+' "$LOG" 2>/dev/null | head -1 || true)
+# records it. fm_pr_first_url_in_file (bin/fm-pr-lib.sh) is the one recognizer
+# for that, shared with bin/fm-fleet-snapshot.sh, so both surfaces accept the
+# same provider set the PR-recording path accepts - GitHub pull URLs and GitLab
+# merge requests alike, not a GitHub-only pattern.
+if [ -z "$PR" ]; then
+  PR=$(fm_pr_first_url_in_file "$LOG" || true)
 fi
 
 # pane_readable is consulted ONLY in the no-run fallback below. The run-step path
@@ -203,34 +206,64 @@ strip_quotes() {
 # return code separates a DETERMINATE CLI answer (0) from an UNAVAILABLE lookup
 # (1), so absence of a run is never inferred from a lookup that never landed.
 #
-# The CLI's own exit code cannot carry that distinction: it answers determinate
-# no-run questions on stdout while exiting non-zero - verified against the
-# installed CLI, `axi status` prints `error: repo not initialized ...` with rc=1,
-# and it carries the sibling determinate answers `No active run. Push through the
-# gate to start a pipeline:` and `0 runs yet in this repository`. Treating a
-# non-zero rc as unavailable would therefore suppress the pending-trigger verdict
-# for exactly the flagship case (a branch whose validation has never been
-# started). So the classification is by evidence, not by rc: a timeout (124), no
-# way to bound the call at all, or a non-zero exit that produced no output
-# whatsoever is unavailable; anything that put an answer on stdout is
-# determinate and gets parsed.
+# The CLI's own exit code cannot carry that distinction, and neither can the
+# choice of stream - verified against the installed CLI (v1.41.2) in an un-gated
+# repo, capturing each stream separately: `axi status` answers `error: repo not
+# initialized (run 'no-mistakes init' first)` on STDOUT with rc=1, while `runs
+# --limit N` answers the same thing on STDERR with rc=1 and an empty stdout. Both
+# are determinate answers meaning "there is no run", and the CLI carries the
+# sibling answers `No active run. Push through the gate to start a pipeline:`,
+# `no runs yet. Push through the gate to start a pipeline:` and `0 runs yet in
+# this repository`. Reading either one as unavailable would suppress the
+# pending-trigger verdict for exactly the flagship case: a branch whose
+# validation has never been started.
+#
+# So classification is by evidence on both streams:
+#   - a timeout (124) or no way to bound the call at all -> unavailable
+#   - anything on stdout                                 -> determinate, parsed
+#   - a non-zero exit whose stderr is a recognized no-run answer -> determinate,
+#     with an intentionally empty data channel (the message is not data)
+#   - any other silent non-zero exit                     -> unavailable
+# The stderr arm is deliberately an allowlist rather than "stderr counts as an
+# answer": a transport failure (daemon connection refused, and its kin) must stay
+# unavailable, or a broken lookup could manufacture a false pending trigger.
+NM_NO_RUN_ANSWER_RE='repo not initialized|no active run|no runs yet|[0-9]+ runs yet'
 HAVE_TIMEOUT=none
 if command -v timeout >/dev/null 2>&1; then HAVE_TIMEOUT=timeout
 elif command -v gtimeout >/dev/null 2>&1; then HAVE_TIMEOUT=gtimeout
 elif command -v perl >/dev/null 2>&1; then HAVE_TIMEOUT=perl
 fi
-nm_run() {  # <args...> -> 0 determinate answer on stdout, 1 lookup unavailable
-  local out rc
+nm_bounded() {  # <args...> - the CLI under whatever bound this host offers
   case "$HAVE_TIMEOUT" in
-    timeout)  out=$( ( cd "$WT" && timeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ); rc=$? ;;
-    gtimeout) out=$( ( cd "$WT" && gtimeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ); rc=$? ;;
-    perl)     out=$( ( cd "$WT" && perl -e 'my $t = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0); exec @ARGV } local $SIG{ALRM} = sub { kill "TERM", -$pid; select undef, undef, undef, 0.2; kill "KILL", -$pid; exit 124 }; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ); rc=$? ;;
-    *)        return 1 ;;
+    timeout)  ( cd "$WT" && timeout "$NM_TIMEOUT" no-mistakes "$@" ) ;;
+    gtimeout) ( cd "$WT" && gtimeout "$NM_TIMEOUT" no-mistakes "$@" ) ;;
+    perl)     ( cd "$WT" && perl -e 'my $t = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0); exec @ARGV } local $SIG{ALRM} = sub { kill "TERM", -$pid; select undef, undef, undef, 0.2; kill "KILL", -$pid; exit 124 }; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$NM_TIMEOUT" no-mistakes "$@" ) ;;
   esac
+}
+# Keeping the two streams apart matters (a stderr message merged into stdout
+# would be parsed as run data), and this script stays side-effect free, so no
+# temp file: the call's stdout is redirected to the enclosing capture through fd
+# 3 while its stderr is captured inline, and rc plus stderr are appended after
+# the call has finished, separated by a control character the CLI never emits.
+NM_STREAM_SEP=$'\001'
+nm_run() {  # <args...> -> 0 determinate answer on stdout, 1 lookup unavailable
+  local combined out err rc rest
+  [ "$HAVE_TIMEOUT" = none ] && return 1
+  combined=$( { err=$(nm_bounded "$@" 2>&1 1>&3 3>&-); rc=$?
+                printf '%s%s%s%s' "$NM_STREAM_SEP" "$rc" "$NM_STREAM_SEP" "$err"; } 3>&1 )
+  out=${combined%%"$NM_STREAM_SEP"*}
+  rest=${combined#*"$NM_STREAM_SEP"}
+  rc=${rest%%"$NM_STREAM_SEP"*}
+  err=${rest#*"$NM_STREAM_SEP"}
+  # $(...) strips trailing newlines only at the very end of the capture, so the
+  # stdout half still carries the CLI's own; strip them to keep "no output" and
+  # "one blank line" the same answer.
+  out=$(printf '%s' "$out")
   [ -n "$out" ] && printf '%s\n' "$out"
   [ "$rc" = 124 ] && return 1
-  [ "$rc" != 0 ] && [ -z "$out" ] && return 1
-  return 0
+  [ "$rc" = 0 ] && return 0
+  [ -n "$out" ] && return 0
+  printf '%s\n' "$err" | grep -qiE "$NM_NO_RUN_ANSWER_RE"
 }
 
 # Scalar value of a TOON key in the captured run output ($RUN_OUT).

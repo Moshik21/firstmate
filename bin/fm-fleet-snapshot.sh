@@ -134,6 +134,9 @@ validate_positive_bound FM_SNAPSHOT_REGISTRY_TIMEOUT "$FM_SNAPSHOT_REGISTRY_TIME
 # shellcheck source=bin/fm-ff-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-ff-lib.sh"  # validate_secondmate_home: shared seeded-home boundary checks
+# shellcheck source=bin/fm-pr-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-pr-lib.sh"  # fm_pr_first_url_in_file: the one recorded-PR recognizer
 
 usage() {
   cat <<'EOF'
@@ -242,9 +245,11 @@ status_event_json() {  # <status-log>
     '{path:$path,present:$present,kind:"event_history",last_event:{state:$verb,note:$note,raw:$raw}}'
 }
 
+# bin/fm-pr-lib.sh owns the single definition of a recorded PR/MR identity, so
+# the status-stream read defers to it rather than carrying a second, GitHub-only
+# pattern that would disagree with the PR-recording path on a GitLab task.
 first_pr_url_in_file() {  # <file>
-  [ -f "$1" ] || return 1
-  grep -Eo 'https?://[^[:space:])"]+/pull/[0-9]+' "$1" 2>/dev/null | head -1
+  fm_pr_first_url_in_file "$1"
 }
 
 backlog_json() {  # [<backlog-path>] - defaults to this home's $BACKLOG
