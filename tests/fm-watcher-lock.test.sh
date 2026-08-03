@@ -447,15 +447,27 @@ test_watch_restart_rejects_reused_pid() {
   pass "watch restart refuses to signal a reused pid"
 }
 
-test_watch_restart_attaches_to_healthy_peer() {
+test_watch_restart_refuses_surviving_predecessor() {
+  # A TERM'd predecessor that outlives the bounded reap wait (here: a
+  # TERM-resistant stand-in for a watcher whose trap is still pending) must be
+  # refused loudly - forking a fresh child would lose the singleton to the
+  # dying holder and leave the arm attached to a watcher about to exit.
   local dir state fakebin out peer identity armpid status i
-  dir=$(make_case restart-healthy-peer)
+  dir=$(make_case restart-surviving-predecessor)
   state="$dir/state"
   fakebin="$dir/fakebin"
   out="$dir/restart.out"
   mark_pr_check_migration_complete "$state"
-  node -e 'process.on("SIGTERM", () => {}); setTimeout(() => {}, 300000)' &
+  # The peer signals readiness only after its TERM handler is installed, so the
+  # restart's TERM can never land on a still-booting (and thus killable) peer.
+  node -e 'process.on("SIGTERM", () => {}); require("fs").writeFileSync(process.argv[1], "ready"); setTimeout(() => {}, 300000)' "$dir/peer-ready" &
   peer=$!
+  i=0
+  while [ "$i" -lt 80 ] && [ ! -e "$dir/peer-ready" ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ -e "$dir/peer-ready" ] || fail "TERM-resistant peer never reported readiness"
   identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$peer") || fail "could not identify peer pid"
   mkdir "$state/.watch.lock"
   printf '%s\n' "$peer" > "$state/.watch.lock/pid"
@@ -463,24 +475,235 @@ test_watch_restart_attaches_to_healthy_peer() {
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
   touch "$state/.last-watcher-beat"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_ARM_ATTACH_POLL=0.1 FM_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" --restart > "$out" &
+  # FM_ARM_REAP_WAIT shortens the bound so this refusal case stays fast; the
+  # derived bound it overrides is covered by the reap-success test below.
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_ARM_REAP_WAIT=1 FM_ARM_ATTACH_POLL=0.1 FM_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" --restart > "$out" &
   armpid=$!
+  wait_for_exit "$armpid" 120
+  status=$?
+  [ "$status" -ne 124 ] || fail "restart arm never returned for a surviving predecessor"
+  [ "$status" -ne 0 ] || fail "restart arm exited zero behind a predecessor that never stopped"
+  grep -qF "watcher: FAILED - predecessor watcher pid $peer is still stopping" "$out" \
+    || fail "restart did not refuse the surviving predecessor loudly: $(cat "$out")"
+  ! grep -qF 'watcher: attached' "$out" || fail "restart attached to the dying predecessor instead of refusing"
+  ! grep -qF 'watcher: started' "$out" || fail "restart forked a fresh watcher behind a live predecessor"
+  [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" = "$peer" ] || fail "restart refusal disturbed the predecessor's lock"
+  is_live_non_zombie "$peer" || fail "restart escalated beyond TERM against the predecessor"
+  grep -q "reason=restart-predecessor-still-stopping" "$state/.watch-cycle-exits.log" \
+    || fail "restart refusal was not classified in the lifecycle ledger"
+  kill -KILL "$peer" 2>/dev/null || true
+  wait "$peer" 2>/dev/null || true
+  pass "watch restart refuses a predecessor that outlives the reap wait instead of attaching to it"
+}
+
+test_watch_restart_reap_bound_covers_event_path_wait() {
+  # Regression: the reap wait must cover the watcher's terminal wait on an
+  # EVENT-CAPABLE backend. There a cycle parks in a foreground command
+  # substitution budgeted at FM_POLL, and bash runs no trap while a foreground
+  # command is outstanding, so a TERM'd watcher parked there cannot exit before
+  # that budget elapses however promptly its trap is written. The bound was a
+  # fixed 5s - shorter than the default 15s budget - so the ordinary event-path
+  # restart hit the loud refusal and needed a retry. This peer stands in for that
+  # watcher: it is TERM-deaf and exits on its own 6s after readiness, past the
+  # old bound but inside the FM_POLL-derived one, so the restart must reap and
+  # replace it rather than refuse.
+  local dir state fakebin out peer identity armpid new_pid i
+  dir=$(make_case restart-reap-bound-event-path)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  out="$dir/restart.out"
+  mark_pr_check_migration_complete "$state"
+  node -e 'process.on("SIGTERM", () => {}); require("fs").writeFileSync(process.argv[1], "ready"); setTimeout(() => process.exit(0), Number(process.argv[2]))' "$dir/peer-ready" 6000 &
+  peer=$!
   i=0
-  while [ "$i" -lt 80 ]; do
-    grep -qF "watcher: attached pid=$peer" "$out" 2>/dev/null && break
+  while [ "$i" -lt 80 ] && [ ! -e "$dir/peer-ready" ]; do
     sleep 0.1
     i=$((i + 1))
   done
-  grep -qF "watcher: attached pid=$peer" "$out" || fail "restart did not attach to the verified healthy peer: $(cat "$out")"
-  is_live_non_zombie "$armpid" || fail "restart arm exited instead of following the healthy peer"
-  is_live_non_zombie "$peer" || fail "restart killed a TERM-resistant peer unexpectedly"
+  [ -e "$dir/peer-ready" ] || fail "slow-exiting peer never reported readiness"
+  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$peer") || fail "could not identify peer pid"
+  mkdir "$state/.watch.lock"
+  printf '%s\n' "$peer" > "$state/.watch.lock/pid"
+  printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
+  printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
+  printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
+  touch "$state/.last-watcher-beat"
+  # No FM_ARM_REAP_WAIT here on purpose: this must exercise the bound actually
+  # derived from FM_POLL in production, not a test-supplied one.
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=30 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" --restart > "$out" &
+  armpid=$!
+  i=0
+  while [ "$i" -lt 250 ]; do
+    grep -qF 'watcher: started pid=' "$out" 2>/dev/null && break
+    grep -qF 'still stopping' "$out" 2>/dev/null && break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  ! grep -qF 'still stopping' "$out" \
+    || fail "restart refused a predecessor that exits past the old 5s bound but within the derived one: $(cat "$out")"
+  grep -qF 'watcher: started pid=' "$out" \
+    || fail "restart did not start a fresh watcher after reaping the slow predecessor: $(cat "$out")"
+  ! is_live_non_zombie "$peer" || fail "slow predecessor outlived the restart that claimed to reap it"
+  new_pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+  { [ -n "$new_pid" ] && [ "$new_pid" != "$peer" ] && kill -0 "$new_pid" 2>/dev/null; } \
+    || fail "fresh watcher does not hold the lock after the slow reap (got '$new_pid')"
+  kill "$armpid" "$new_pid" 2>/dev/null || true
+  wait "$armpid" 2>/dev/null || true
   kill -KILL "$peer" 2>/dev/null || true
   wait "$peer" 2>/dev/null || true
-  wait_for_exit "$armpid" 80
+  pass "watch restart reaps a predecessor that outlives the old fixed bound but exits within the derived one"
+}
+
+test_watch_restart_reap_bound_covers_crew_state_wait() {
+  # Regression, second span: FM_POLL is not the only foreground budget a TERM'd
+  # watcher can be parked in. The crew-state call inside crew_absorb_class is a
+  # foreground command substitution bounded by FM_CREW_STATE_NM_TIMEOUT that can
+  # chain a second bounded no-mistakes call, so it can hold the trap for twice
+  # that timeout - which on a short-poll home is far longer than FM_POLL. A bound
+  # derived from FM_POLL alone refuses that ordinary restart. Here FM_POLL=1 and
+  # FM_CREW_STATE_NM_TIMEOUT=10 make the two budgets disagree (6s vs 25s); the
+  # peer answers TERM 8s in, past a poll-only bound and inside the max-of-both.
+  local dir state fakebin out peer identity armpid new_pid i
+  dir=$(make_case restart-reap-bound-crew-state)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  out="$dir/restart.out"
+  mark_pr_check_migration_complete "$state"
+  node -e 'process.on("SIGTERM", () => {}); require("fs").writeFileSync(process.argv[1], "ready"); setTimeout(() => process.exit(0), Number(process.argv[2]))' "$dir/peer-ready" 8000 &
+  peer=$!
+  i=0
+  while [ "$i" -lt 80 ] && [ ! -e "$dir/peer-ready" ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ -e "$dir/peer-ready" ] || fail "slow-exiting peer never reported readiness"
+  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$peer") || fail "could not identify peer pid"
+  mkdir "$state/.watch.lock"
+  printf '%s\n' "$peer" > "$state/.watch.lock/pid"
+  printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
+  printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
+  printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
+  touch "$state/.last-watcher-beat"
+  # No FM_ARM_REAP_WAIT here on purpose: the bound under test is the derived one.
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_CREW_STATE_NM_TIMEOUT=10 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" --restart > "$out" &
+  armpid=$!
+  i=0
+  while [ "$i" -lt 300 ]; do
+    grep -qF 'watcher: started pid=' "$out" 2>/dev/null && break
+    grep -qF 'still stopping' "$out" 2>/dev/null && break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  ! grep -qF 'still stopping' "$out" \
+    || fail "restart refused a predecessor parked in the crew-state span with FM_POLL=1: $(cat "$out")"
+  grep -qF 'watcher: started pid=' "$out" \
+    || fail "restart did not start a fresh watcher after reaping the crew-state-span predecessor: $(cat "$out")"
+  ! is_live_non_zombie "$peer" || fail "crew-state-span predecessor outlived the restart that claimed to reap it"
+  new_pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+  { [ -n "$new_pid" ] && [ "$new_pid" != "$peer" ] && kill -0 "$new_pid" 2>/dev/null; } \
+    || fail "fresh watcher does not hold the lock after the crew-state-span reap (got '$new_pid')"
+  kill "$armpid" "$new_pid" 2>/dev/null || true
+  wait "$armpid" 2>/dev/null || true
+  kill -KILL "$peer" 2>/dev/null || true
+  wait "$peer" 2>/dev/null || true
+  pass "watch restart reaps a predecessor parked in the crew-state span even when FM_POLL is short"
+}
+
+test_watch_restart_replaces_prompt_predecessor() {
+  # The happy restart path, and the trap-interruptibility regression: a real
+  # watcher parked in its FM_POLL=30 terminal wait must die promptly on TERM
+  # (backgrounded snooze, not a foreground sleep that defers the trap), so the
+  # reap wait succeeds and a fresh confirmed watcher replaces it. With a
+  # deferred trap the 5s reap wait would expire first and this restart would
+  # refuse instead of starting.
+  local dir state fakebin out old_pid new_pid armpid i
+  dir=$(make_case restart-prompt-predecessor)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  out="$dir/restart.out"
+  mark_pr_check_migration_complete "$state"
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=30 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch.out" &
+  old_pid=$!
+  i=0
+  while [ "$i" -lt 80 ]; do
+    [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" = "$old_pid" ] \
+      && [ -s "$state/.watch.lock/pid-identity" ] \
+      && [ -e "$state/.last-watcher-beat" ] \
+      && break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" = "$old_pid" ] || fail "seed watcher did not publish its lock"
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=30 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" --restart > "$out" &
+  armpid=$!
+  i=0
+  while [ "$i" -lt 100 ]; do
+    grep -qF 'watcher: started pid=' "$out" 2>/dev/null && break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  grep -qF 'watcher: started pid=' "$out" \
+    || fail "restart did not replace a promptly-stopping predecessor with a fresh watcher: $(cat "$out")"
+  ! grep -qF 'still stopping' "$out" || fail "restart refused a predecessor whose TERM trap should have run promptly"
+  ! is_live_non_zombie "$old_pid" || fail "TERM'd predecessor is still running after the fresh watcher started"
+  new_pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+  { [ -n "$new_pid" ] && [ "$new_pid" != "$old_pid" ] && kill -0 "$new_pid" 2>/dev/null; } \
+    || fail "fresh watcher does not hold the lock after restart (got '$new_pid')"
+  kill "$armpid" "$new_pid" 2>/dev/null || true
+  wait "$armpid" 2>/dev/null || true
+  wait "$old_pid" 2>/dev/null || true
+  pass "watch restart promptly reaps a TERM'd predecessor parked in its poll wait and starts a confirmed successor"
+}
+
+test_attached_arm_reports_owner_delivered_close() {
+  # Two arms on one watcher: the owner (which started it) delivers the
+  # actionable close; the attached duplicate holds no handle on the watcher's
+  # stdout, so it must resolve the close against the watcher's terminal-delivery
+  # ledger and reprint that same reason with exit 0, never the typed FAILED that
+  # a genuinely reasonless death earns.
+  local dir state fakebin owner_out attached_out owner_arm attached_arm wpid i status
+  dir=$(make_case attached-owner-delivered)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  owner_out="$dir/owner-arm.out"
+  attached_out="$dir/attached-arm.out"
+  mark_pr_check_migration_complete "$state"
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$owner_out" &
+  owner_arm=$!
+  i=0
+  while [ "$i" -lt 80 ]; do
+    grep -qF 'watcher: started pid=' "$owner_out" 2>/dev/null && break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  wpid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+  grep -qF "watcher: started pid=$wpid" "$owner_out" || fail "owner arm did not start its watcher"
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_ARM_ATTACH_POLL=0.1 FM_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" > "$attached_out" &
+  attached_arm=$!
+  i=0
+  while [ "$i" -lt 80 ]; do
+    grep -qF "watcher: attached pid=$wpid" "$attached_out" 2>/dev/null && break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  grep -qF "watcher: attached pid=$wpid" "$attached_out" || fail "duplicate arm did not attach to the owner's watcher"
+  # A captain-relevant status closes the cycle actionably through the owner.
+  printf 'done: synthetic finish\n' > "$state/task.status"
+  wait_for_exit "$owner_arm" 100
   status=$?
-  [ "$status" -ne 0 ] && [ "$status" -ne 124 ] || fail "restart arm did not fail after its attached peer ended without a successor (status $status)"
-  grep -qF 'watcher: FAILED - cycle ended without an actionable reason' "$out" || fail "restart arm did not surface the attached cycle end"
-  pass "watch restart attaches to a verified healthy peer and later surfaces a successor gap"
+  [ "$status" -eq 0 ] || fail "owner arm did not deliver the actionable close cleanly (status $status): $(cat "$owner_out")"
+  grep -qF 'signal:' "$owner_out" || fail "owner arm did not print the delivered wake reason"
+  wait_for_exit "$attached_arm" 100
+  status=$?
+  [ "$status" -eq 0 ] || fail "attached arm did not close cleanly after an owner-delivered cycle (status $status): $(cat "$attached_out")"
+  grep -qF 'signal:' "$attached_out" \
+    || fail "attached arm did not reprint the reason the watcher durably delivered: $(cat "$attached_out")"
+  ! grep -qF 'watcher: FAILED' "$attached_out" || fail "attached arm reported FAILED for an owner-delivered close"
+  grep -q "^$wpid	" "$state/.watch-deliveries.log" \
+    || fail "the watcher did not publish its delivered reason to the terminal-delivery ledger"
+  grep -q "reason=attached-delivered-wake" "$state/.watch-cycle-exits.log" \
+    || fail "the recovered attached close was not classified in the lifecycle ledger"
+  pass "an attached duplicate arm reprints an owner-delivered wake instead of reporting FAILED"
 }
 
 test_watcher_self_evicts_on_lock_takeover() {
@@ -1037,10 +1260,14 @@ test_lock_empty_pid_uses_minimum_grace
 test_lock_late_claim_loses_after_recreate
 test_lock_paused_mid_acquire_claim_fails_during_steal
 test_watch_restart_rejects_reused_pid
-test_watch_restart_attaches_to_healthy_peer
+test_watch_restart_refuses_surviving_predecessor
+test_watch_restart_reap_bound_covers_event_path_wait
+test_watch_restart_reap_bound_covers_crew_state_wait
+test_watch_restart_replaces_prompt_predecessor
 test_watcher_self_evicts_on_lock_takeover
 test_arm_self_eviction_is_loud_without_successor
 test_arm_attaches_and_waits_for_live_fresh_watcher
+test_attached_arm_reports_owner_delivered_close
 test_attached_arm_signal_is_recorded_in_cycle_ledger
 test_arm_starts_and_self_heals
 test_arm_hup_cleans_child_and_temp_output

@@ -786,10 +786,202 @@ test_exited_declared_pause_is_bounded_but_live_gate_surfaces() {
   pass "exited declared-pause and captain-held panes use bounded pause cadence while a live decision gate still surfaces once"
 }
 
-test_secondmate_paused_resurfaces_in_normal_mode() {
-  local dir state fakebin out capture_file statusf window key pane_hash sig pid back
-  dir=$(make_case secondmate-paused-resurface); state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/secondmate-held.status"
+# The costly authoritative read behind pause classification (fm-crew-state.sh,
+# which may make a bounded no-mistakes call) must run once per
+# STALE_ESCALATE_SECS for a live-agent declared pause, not once per poll: the
+# full evaluation caches its verdict in the recheck marker and the cheap window
+# serves the cache. The bounded re-surface must still fire without a fresh
+# costly read.
+test_paused_live_agent_recheck_is_throttled() {
+  local dir state fakebin out capture_file statusf window key pane_hash sig pid calls back wakes
+  dir=$(make_case paused-live-agent-throttle); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; capture_file="$dir/pane.txt"; statusf="$state/throttle.status"
+  window="test:fm-throttle"
+  calls="$dir/crew-state-calls"
+  : > "$calls"
+  printf 'idle awaiting external\n' > "$capture_file"
+  printf 'window=%s\nkind=ship\nharness=grok\nbackend=tmux\n' "$window" > "$state/throttle.meta"
+  printf 'paused: awaiting the upstream release\n' > "$statusf"
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-throttle_status"
+  key=$(printf '%s' "$window" | tr ':/.' '___')
+  pane_hash=$(hash_text "idle awaiting external")
+  printf '%s' "$pane_hash" > "$state/.hash-$key"
+  printf '1\n' > "$state/.count-$key"
+  # Counting stub: every authoritative read appends one line before answering.
+  cat > "$fakebin/fm-crew-state.sh" <<SH
+#!/usr/bin/env bash
+set -u
+printf 'x\n' >> "$calls"
+printf '%s\n' "\${FM_FAKE_CREW_STATE:-state: unknown · source: none · fake default}"
+SH
+  chmod +x "$fakebin/fm-crew-state.sh"
+  export FM_FAKE_CREW_STATE='state: paused · source: status-log · awaiting the upstream release'
+
+  # Phase A: first sight of a live-agent declared pause surfaces once (one
+  # authoritative read).
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_FAKE_TMUX_CURRENT_COMMAND=grok \
+    FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_PAUSE_RESURFACE_SECS=999 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 40 || fail "live-agent declared pause did not surface once on first sight"
+  grep -F "stale: $window" "$out" >/dev/null || fail "live-agent pause first sight did not print its stale surface"
+  [ "$(grep -c . "$calls")" -eq 1 ] || fail "first sight took $(grep -c . "$calls") authoritative reads instead of 1"
+
+  # Phase B: steady absorb polls serve the cached verdict - zero further reads.
+  : > "$out"
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_FAKE_TMUX_CURRENT_COMMAND=grok \
+    FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_PAUSE_RESURFACE_SECS=999 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  if ! wait_live "$pid" 30; then
+    reap "$pid"; fail "absorbing live-agent pause surfaced during the cache window: $(cat "$out")"
+  fi
+  reap "$pid"
+  [ "$(grep -c . "$calls")" -eq 1 ] \
+    || fail "steady absorb re-ran the authoritative read $(grep -c . "$calls") times for a cached pause verdict"
+  [ -e "$state/.paused-$key" ] || fail "live-agent pause lost its pause cadence marker while absorbing"
+
+  # Phase C: the bounded re-surface fires from the cache alone.
+  back=$(( $(date +%s) - 500 ))
+  if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
+  else touch -m -d "@$back" "$statusf"; fi
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-throttle_status"
+  set_mtime "$back" "$state/.paused-resurfaced-$key"
+  : > "$out"
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_FAKE_TMUX_CURRENT_COMMAND=grok \
+    FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 40 || fail "cached live-agent pause did not re-surface past the bounded cadence"
+  grep -F "awaiting external" "$out" >/dev/null || fail "cached pause re-surface omitted its external-wait reason"
+  grep -F "possible wedge" "$out" >/dev/null && fail "cached pause re-surface was mislabeled a wedge"
+  [ "$(grep -c . "$calls")" -eq 1 ] \
+    || fail "the bounded re-surface took $(grep -c . "$calls") authoritative reads instead of reusing the cache"
+  wakes=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w { n++ } END { print n + 0 }' "$state/.wake-queue")
+  [ "$wakes" -eq 2 ] || fail "expected exactly the first-sight surface plus one re-surface, got $wakes stale wakes"
+  unset FM_FAKE_CREW_STATE
+  pass "a live-agent declared pause runs one authoritative read per cache window and still re-surfaces on the bounded cadence"
+}
+
+# A declared pause whose endpoint no longer captures must keep its bounded
+# recheck: a confirmed-dead agent surfaces the gone endpoint once and then
+# stays on the PAUSE_RESURFACE_SECS cadence, while a transient capture failure
+# with a live agent keeps the historical silent skip.
+test_paused_gone_endpoint_keeps_bounded_recheck() {
+  local dir state fakebin out capture_file statusf window key sig pid back wakes
+  dir=$(make_case paused-gone-endpoint); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; statusf="$state/gone.status"
+  window="test:fm-gone"
+  printf 'window=%s\nkind=ship\nharness=grok\nbackend=tmux\n' "$window" > "$state/gone.meta"
+  printf 'paused: awaiting the upstream release\n' > "$statusf"
+  back=$(( $(date +%s) - 500 ))
+  if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
+  else touch -m -d "@$back" "$statusf"; fi
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-gone_status"
+  key=$(printf '%s' "$window" | tr ':/.' '___')
+  # Capture always fails; window inventory decides agent liveness (missing
+  # window -> dead, present window with a harness command -> alive).
+  cat > "$fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+set -u
+case "${1:-}" in
+  list-windows)
+    [ -n "${FM_FAKE_TMUX_WINDOW:-}" ] && printf '%s\n' "${FM_FAKE_TMUX_WINDOW#*:}"
+    exit 0 ;;
+  capture-pane) exit 1 ;;
+  display-message)
+    case "$*" in
+      *pane_current_command*) printf '%s\n' "${FM_FAKE_TMUX_CURRENT_COMMAND:-}"; exit 0 ;;
+    esac ;;
+esac
+exit 1
+SH
+  chmod +x "$fakebin/tmux"
+
+  # Phase A: confirmed-dead endpoint surfaces once as gone.
+  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" \
+    FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 40 || fail "gone paused endpoint did not surface once"
+  grep -F "endpoint gone" "$out" >/dev/null || fail "gone paused endpoint surface omitted its reason: $(cat "$out")"
+  [ -e "$state/.paused-gone-$key" ] || fail "gone paused endpoint did not record its one-shot marker"
+  [ -e "$state/.paused-$key" ] || fail "gone paused endpoint did not enter the pause cadence"
+
+  # Phase B: already-surfaced gone endpoint absorbs inside the cadence window.
+  : > "$out"
+  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" \
+    FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  if ! wait_live "$pid" 30; then
+    reap "$pid"; fail "gone paused endpoint re-surfaced inside its cadence window: $(cat "$out")"
+  fi
+  reap "$pid"
+  [ ! -s "$out" ] || fail "absorbed gone paused endpoint printed a wake reason: $(cat "$out")"
+
+  # Phase C: the bounded recheck still fires past the cadence.
+  set_mtime "$back" "$state/.paused-resurfaced-$key"
+  : > "$out"
+  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" \
+    FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 40 || fail "gone paused endpoint did not re-surface past the bounded cadence"
+  grep -F "rechecked on a long cadence" "$out" >/dev/null || fail "gone endpoint recheck omitted its cadence reason: $(cat "$out")"
+  wakes=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w { n++ } END { print n + 0 }' "$state/.wake-queue")
+  [ "$wakes" -eq 2 ] || fail "expected the one-shot gone surface plus one recheck, got $wakes stale wakes"
+
+  # Counterfactual: a capture failure with a live agent stays a silent skip.
+  dir=$(make_case paused-gone-endpoint-alive); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; statusf="$state/blip.status"
+  window="test:fm-blip"
+  printf 'window=%s\nkind=ship\nharness=grok\nbackend=tmux\n' "$window" > "$state/blip.meta"
+  printf 'paused: awaiting the upstream release\n' > "$statusf"
+  if [ "$(uname)" = Darwin ]; then touch -mt "$(date -r "$back" '+%Y%m%d%H%M.%S')" "$statusf"
+  else touch -m -d "@$back" "$statusf"; fi
+  sig=$(seen_sig "$statusf"); printf '%s' "$sig" > "$state/.seen-blip_status"
+  key=$(printf '%s' "$window" | tr ':/.' '___')
+  cat > "$fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+set -u
+case "${1:-}" in
+  list-windows)
+    [ -n "${FM_FAKE_TMUX_WINDOW:-}" ] && printf '%s\n' "${FM_FAKE_TMUX_WINDOW#*:}"
+    exit 0 ;;
+  capture-pane) exit 1 ;;
+  display-message)
+    case "$*" in
+      *pane_current_command*) printf '%s\n' "${FM_FAKE_TMUX_CURRENT_COMMAND:-}"; exit 0 ;;
+    esac ;;
+esac
+exit 1
+SH
+  chmod +x "$fakebin/tmux"
+  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CURRENT_COMMAND=grok \
+    FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" \
+    FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  if ! wait_live "$pid" 30; then
+    reap "$pid"; fail "live-agent capture blip surfaced instead of skipping silently: $(cat "$out")"
+  fi
+  reap "$pid"
+  [ ! -s "$out" ] || fail "live-agent capture blip printed a wake reason: $(cat "$out")"
+  [ ! -e "$state/.paused-gone-$key" ] || fail "live-agent capture blip recorded a gone-endpoint marker"
+  pass "a gone paused endpoint surfaces once with a bounded recheck while a live-agent capture blip stays silent"
+}
+
+# A secondmate's endpoint is never pane-supervised (AGENTS.md section 8): even a
+# declared pause must not opt it into the stale loop's pause cadence. Its routed
+# status writes remain the supervision channel and still wake normally.
+test_secondmate_paused_stale_stays_suppressed() {
+  local dir state fakebin out drain_out capture_file statusf window key pane_hash sig pid back
+  dir=$(make_case secondmate-paused-suppressed); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; drain_out="$dir/drain.out"; capture_file="$dir/pane.txt"; statusf="$state/secondmate-held.status"
   window="test:fm-secondmate-held"
   printf 'idle awaiting external\n' > "$capture_file"
   printf 'window=%s\nkind=secondmate\n' "$window" > "$state/secondmate-held.meta"
@@ -807,12 +999,21 @@ test_secondmate_paused_resurfaces_in_normal_mode() {
     FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
   pid=$!
-  wait_for_exit "$pid" 40 || fail "watcher did not re-surface a paused secondmate"
-  grep -F "stale: $window" "$out" >/dev/null || fail "paused secondmate did not emit a stale recheck"
-  grep -F "awaiting external" "$out" >/dev/null || fail "paused secondmate recheck omitted its external-wait reason"
-  grep -F "possible wedge" "$out" >/dev/null && fail "paused secondmate was mislabeled a wedge"
+  if ! wait_live "$pid" 30; then
+    reap "$pid"; fail "watcher surfaced a paused secondmate pane despite the stale exemption: $(cat "$out")"
+  fi
+  [ ! -s "$out" ] || { reap "$pid"; fail "paused secondmate pane printed a wake reason: $(cat "$out")"; }
+  [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "paused secondmate pane enqueued a stale wake"; }
+  [ ! -e "$state/.paused-$key" ] || { reap "$pid"; fail "paused secondmate pane entered the pause cadence"; }
+  # The routed status channel still supervises: a captain-relevant append wakes.
+  printf 'done: routed reply landed\n' >> "$statusf"
+  wait_for_exit "$pid" 60 || fail "secondmate routed status append did not wake the watcher"
+  grep -F "signal:" "$out" >/dev/null || fail "secondmate routed status append was not surfaced as a signal"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "drain after the routed status wake failed"
+  grep "$(printf '\tsignal\t')" "$drain_out" | grep -F "secondmate-held.status" >/dev/null \
+    || fail "secondmate routed status wake was not queued"
   unset FM_FAKE_CREW_STATE
-  pass "a declared paused secondmate re-surfaces on the bounded normal-mode cadence"
+  pass "a paused secondmate pane stays out of stale supervision while its routed status still wakes"
 }
 
 test_secondmate_nonpaused_stale_remains_suppressed() {
@@ -1826,7 +2027,9 @@ test_busy_pane_default_turn_age_bound_is_3600s
 test_nonterminal_stale_not_working_surfaced
 test_nonterminal_stale_paused_absorbed_then_resurfaced
 test_exited_declared_pause_is_bounded_but_live_gate_surfaces
-test_secondmate_paused_resurfaces_in_normal_mode
+test_paused_live_agent_recheck_is_throttled
+test_paused_gone_endpoint_keeps_bounded_recheck
+test_secondmate_paused_stale_stays_suppressed
 test_secondmate_nonpaused_stale_remains_suppressed
 test_secondmate_unpause_clears_pause_tracking
 test_nonterminal_stale_pause_transitions_reclassify_unchanged_hash

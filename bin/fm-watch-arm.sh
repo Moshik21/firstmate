@@ -53,7 +53,10 @@
 #
 # --restart: stop ONLY this FM_HOME's watcher (the pid recorded in THIS home's
 # state/.watch.lock) and own a fresh cycle, or attach if a verified live peer
-# wins the singleton while the duplicate child stands down. It
+# wins the singleton while the duplicate child stands down. A TERM'd
+# predecessor that outlives the bounded reap wait is refused loudly (typed
+# FAILED, exit 1, no fresh fork) rather than raced: forking behind a
+# still-dying holder would attach this arm to a watcher about to exit. It
 # resolves and signals exactly that pid, so it can never touch another home's
 # watcher. NEVER `pkill -f
 # bin/fm-watch.sh`: that pattern matches every firstmate home's watcher
@@ -79,6 +82,36 @@ esac
 CONFIRM_TIMEOUT=${FM_ARM_CONFIRM_TIMEOUT:-$ARM_CONFIRM_DEFAULT}
 # Poll interval while attached to an existing healthy watcher.
 ATTACH_POLL=${FM_ARM_ATTACH_POLL:-0.5}
+# How long --restart waits for a TERM'd predecessor to exit before refusing, in
+# seconds. The bound must cover EVERY non-interruptible foreground span a TERM'd
+# watcher can be parked in, because bash runs no trap while a foreground command
+# is outstanding, so a watcher parked in one cannot exit before that span's own
+# budget elapses no matter how promptly its trap is written. Two spans matter:
+# the terminal wait on an EVENT-CAPABLE backend, a foreground command
+# substitution budgeted at FM_POLL, and the crew-state call inside
+# crew_absorb_class (bin/fm-classify-lib.sh), a foreground command substitution
+# bounded by FM_CREW_STATE_NM_TIMEOUT that can chain a second bounded
+# no-mistakes call, hence twice that timeout. A bound below either would refuse
+# an ordinary restart, so take the MAXIMUM of the two budgets plus a margin for
+# the trap and exit, never below the historical bound. These budgets are read
+# from this arm's own environment, which need not match the one the running
+# predecessor was launched with; the max-of-budgets width is the mitigation.
+# FM_ARM_REAP_WAIT overrides the result outright so tests can drive it short.
+REAP_WAIT_MIN=5
+REAP_WAIT_MARGIN=5
+reap_poll_budget=${FM_POLL:-15}
+reap_poll_budget=${reap_poll_budget%%.*}   # FM_POLL may be fractional; whole seconds are enough here
+case "$reap_poll_budget" in ''|*[!0-9]*) reap_poll_budget=15 ;; esac
+reap_crew_state_budget=${FM_CREW_STATE_NM_TIMEOUT:-10}
+reap_crew_state_budget=${reap_crew_state_budget%%.*}
+case "$reap_crew_state_budget" in ''|*[!0-9]*|0) reap_crew_state_budget=10 ;; esac
+reap_crew_state_budget=$((reap_crew_state_budget * 2))
+REAP_WAIT=$reap_poll_budget
+[ "$reap_crew_state_budget" -gt "$REAP_WAIT" ] && REAP_WAIT=$reap_crew_state_budget
+REAP_WAIT=$((REAP_WAIT + REAP_WAIT_MARGIN))
+[ "$REAP_WAIT" -lt "$REAP_WAIT_MIN" ] && REAP_WAIT=$REAP_WAIT_MIN
+REAP_WAIT=${FM_ARM_REAP_WAIT:-$REAP_WAIT}
+case "$REAP_WAIT" in ''|*[!0-9]*|0) REAP_WAIT=$REAP_WAIT_MIN ;; esac
 CYCLE_LOG="$STATE/.watch-cycle-exits.log"
 CYCLE_LOG_LOCK="$STATE/.watch-cycle-exits.lock"
 CYCLE_LOG_MAX_BYTES=${FM_WATCH_CYCLE_LOG_MAX_BYTES:-262144}
@@ -87,7 +120,9 @@ ARM_PID=${BASHPID:-$$}
 case "$CYCLE_LOG_MAX_BYTES" in ''|*[!0-9]*|0) CYCLE_LOG_MAX_BYTES=262144 ;; esac
 case "$CYCLE_LOG_KEEP_LINES" in ''|*[!0-9]*|0) CYCLE_LOG_KEEP_LINES=1000 ;; esac
 
-# The lifecycle ledger is diagnostic evidence, not a supervision dependency.
+# The lifecycle ledger is diagnostic evidence, not a supervision dependency:
+# classifying an unobserved close reads the watcher's separate terminal-delivery
+# ledger (state/.watch-deliveries.log), never this one.
 # Writes are bounded and best-effort so an observability failure cannot stall an
 # otherwise healthy watcher cycle.
 cycle_clean_field() {
@@ -389,10 +424,23 @@ if [ "$mode" = restart ]; then
       # either takes a released lock or reclaims a now-dead-pid stale lock instead
       # of seeing the dying one as a live holder and no-opping.
       i=0
-      while [ "$i" -lt 50 ] && fm_pid_alive "$lock_pid"; do
+      reap_ticks=$((REAP_WAIT * 10))
+      while [ "$i" -lt "$reap_ticks" ] && fm_pid_alive "$lock_pid"; do
         sleep 0.1
         i=$((i + 1))
       done
+      # REAP_WAIT already covers the event-capable terminal wait, so a
+      # predecessor still alive here is not merely mid-poll: it is TERM-resistant
+      # or wedged in a call longer than that budget. Forking a child now would
+      # lose the singleton to that dying holder and leave this arm attached to a
+      # watcher about to exit. Refuse loudly instead; the caller retries once it
+      # has exited.
+      if fm_pid_alive "$lock_pid"; then
+        cycle_begin "$lock_pid" restart-refused "$(fm_pid_identity "$lock_pid" 2>/dev/null || true)"
+        cycle_log_append unknown none restart-predecessor-still-stopping none
+        echo "watcher: FAILED - predecessor watcher pid $lock_pid is still stopping; no new watcher was started - retry --restart after it exits"
+        exit 1
+      fi
     else
       clear_stale_recorded_watcher_lock
     fi

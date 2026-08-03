@@ -8,7 +8,12 @@
 # otherwise, so a crew that finishes (or stops and waits) without a current
 # working signal is never silently swallowed. A declared external-wait pause is
 # the separate idle absorb case and re-surfaces only on its long bounded cadence,
-# although its initial no-verb status signal still surfaces in normal mode.
+# although its initial no-verb status signal still surfaces in normal mode; a
+# paused window whose endpoint is gone with a confirmed-dead agent keeps that
+# same bounded cadence via handle_paused_gone_endpoint instead of silently
+# dropping out of supervision. Secondmate windows are never pane-supervised at
+# all (AGENTS.md section 8): their routed status writes still flow through the
+# signal path, but the stale loop skips them entirely.
 # While state/.afk exists, the daemon owns triage and this watcher queues and exits
 # on every wake. Printed reason lines:
 #   signal: <file>...      status/turn-end signals, surfaced when a listed status
@@ -181,6 +186,18 @@ hash_pane() {
   if command -v md5 >/dev/null 2>&1; then md5 -q; else md5sum | cut -d' ' -f1; fi
 }
 
+# Trap-interruptible sleep. A foreground `sleep` defers HUP/INT/TERM until it
+# finishes, so a stopping watcher could linger a full poll or signal-grace
+# period before its trap runs - long enough for a --restart's bounded reap wait
+# to expire and mistake the dying holder for a live singleton. Backgrounding
+# the sleep lets the `wait` builtin return the moment a trapped signal
+# arrives, so the trap's exit runs immediately; the orphaned sleep child is
+# inert and expires on its own.
+snooze() {  # <seconds>
+  sleep "$1" &
+  wait $!
+}
+
 # window_is_busy: 0 (busy) iff the task's harness is PROVABLY working, through
 # the semantic busy-state contract (bin/fm-busy-lib.sh). Only an exact busy
 # verdict returns 0: idle, unknown, and dead all return 1, so a converted
@@ -345,12 +362,48 @@ handle_paused_stale() {  # <window> <task> <hash>
   triage_log "absorbed stale (paused, awaiting external, age ${age}s): $win"
 }
 
+# A declared pause or captain-held transfer whose recorded endpoint no longer
+# even captures must not fall out of supervision silently: skipping the window
+# would end the pause's bounded recheck with no signal, so a forgotten wait
+# could rot invisibly behind a dead pane. Only a confirmed-dead agent takes
+# this path - a transient capture failure with a live or unreadable agent
+# stays the silent skip it always was, retried next poll. The gone endpoint
+# surfaces once, then keeps the same bounded PAUSE_RESURFACE_SECS cadence a
+# dead-agent pause already uses.
+handle_paused_gone_endpoint() {  # <window> <task>
+  local win=$1 task=$2 key agent_alive statusf mtime age rf rf_age reason
+  agent_alive=$(fm_backend_agent_alive "$(window_backend "$win")" "$win" 2>/dev/null) || agent_alive=unknown
+  [ "$agent_alive" = dead ] || return 0
+  key=$(printf '%s' "$win" | tr ':/.' '___')
+  : > "$STATE/.paused-$key"
+  statusf="$STATE/$task.status"
+  mtime=$(stat_mtime "$statusf")
+  case "$mtime" in ''|*[!0-9]*) mtime=$(date +%s) ;; esac
+  age=$(( $(date +%s) - mtime ))
+  rf="$STATE/.paused-resurfaced-$key"
+  if [ ! -e "$STATE/.paused-gone-$key" ]; then
+    : > "$STATE/.paused-gone-$key"
+    reason="stale: $win (paused ${age}s, awaiting external, endpoint gone - the declared wait has no live endpoint left; restore the worker or convert the wait to a captain-held backlog item)"
+    fm_wake_append stale "$win" "$reason" || exit 1
+    date +%s > "$rf"
+    wake "$reason"
+  fi
+  rf_age=$(age_of "$rf")   # 999999 when no prior re-surface
+  if [ "$age" -ge "$PAUSE_RESURFACE_SECS" ] && [ "$rf_age" -ge "$PAUSE_RESURFACE_SECS" ]; then
+    reason="stale: $win (paused ${age}s, awaiting external, endpoint gone - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)"
+    fm_wake_append stale "$win" "$reason" || exit 1
+    date +%s > "$rf"
+    wake "$reason"
+  fi
+  triage_log "absorbed stale (paused, endpoint gone, age ${age}s): $win"
+}
+
 clear_pause_state() {  # <window>
   local win=$1 key
   key=${win//:/_}
   key=${key//\//_}
   key=${key//./_}
-  rm -f "$STATE/.paused-$key" "$STATE/.paused-rechecked-$key" "$STATE/.paused-resurfaced-$key"
+  rm -f "$STATE/.paused-$key" "$STATE/.paused-rechecked-$key" "$STATE/.paused-resurfaced-$key" "$STATE/.paused-gone-$key"
 }
 
 clear_pause_tracking() {  # <window>
@@ -364,9 +417,17 @@ clear_pause_tracking() {  # <window>
 
 # Reconcile a declared pause or captain-held status with authoritative crew state.
 # Only a confidently dead ordinary crew may recover paused classification after
-# fm-crew-state has fallen back to stopped or unknown.
+# fm-crew-state has fallen back to stopped or unknown. Every caller sits below
+# the stale loop's unconditional secondmate skip, so the window here is always an
+# ordinary crew and the liveness probe needs no kind check of its own.
+# The costly authoritative reads (crew_absorb_class, plus the agent-liveness
+# probe) run at most once per STALE_ESCALATE_SECS: the full evaluation caches its
+# verdict as the recheck marker's content, and the cheap window in between serves
+# that cached verdict with no backend or crew-state call at all. A cached verdict never delays pause exit, because
+# the status-line check above the cache runs on every call and a resumed run
+# re-classifies as working on the next full read.
 pause_state_class() {  # <window> <task>
-  local win=$1 task=$2 key last recheck_file class agent_alive
+  local win=$1 task=$2 key last recheck_file class agent_alive cached
   key=${win//:/_}
   key=${key//\//_}
   key=${key//./_}
@@ -378,15 +439,11 @@ pause_state_class() {  # <window> <task>
     return
   fi
   if [ -e "$STATE/.paused-$key" ] && [ "$(age_of "$recheck_file")" -lt "$STALE_ESCALATE_SECS" ]; then
-    if [ "$(window_kind "$win")" != secondmate ]; then
-      agent_alive=$(fm_backend_agent_alive "$(window_backend "$win")" "$win" 2>/dev/null) || agent_alive=unknown
-      if [ "$agent_alive" != dead ]; then
-        rm -f "$recheck_file"
-        printf 'none'
-        return
-      fi
-    fi
-    printf 'paused'
+    cached=$(cat "$recheck_file" 2>/dev/null || true)
+    case "$cached" in
+      none) printf 'none' ;;
+      *) printf 'paused' ;;   # includes legacy epoch-content markers
+    esac
     return
   fi
   class=$(crew_absorb_class "$task")
@@ -395,19 +452,10 @@ pause_state_class() {  # <window> <task>
     printf 'working'
     return
   fi
-  if [ "$(window_kind "$win")" != secondmate ]; then
-    agent_alive=$(fm_backend_agent_alive "$(window_backend "$win")" "$win" 2>/dev/null) || agent_alive=unknown
-    if [ "$agent_alive" != dead ]; then
-      rm -f "$recheck_file"
-      printf 'none'
-      return
-    fi
-  fi
-  [ "$class" = none ] && [ "${agent_alive:-unknown}" = dead ] && class=paused
-  case "$class" in
-    paused) date +%s > "$recheck_file" ;;
-    *) rm -f "$recheck_file" ;;
-  esac
+  agent_alive=$(fm_backend_agent_alive "$(window_backend "$win")" "$win" 2>/dev/null) || agent_alive=unknown
+  [ "$agent_alive" = dead ] || class=none
+  [ "$class" = none ] && [ "$agent_alive" = dead ] && class=paused
+  printf '%s' "$class" > "$recheck_file"
   printf '%s' "$class"
 }
 
@@ -421,7 +469,7 @@ surface_nonterminal_stale() {  # <window> <hash>
   last=$(last_status_line "$STATE/$task.status")
   if status_is_paused_or_captain_held "$last"; then
     : > "$STATE/.paused-$key"
-    date +%s > "$STATE/.paused-rechecked-$key"
+    printf 'none' > "$STATE/.paused-rechecked-$key"
     date +%s > "$STATE/.paused-resurfaced-$key"
   else
     rm -f "$STATE/.paused-$key" "$STATE/.paused-rechecked-$key" "$STATE/.paused-resurfaced-$key"
@@ -655,7 +703,7 @@ event_wait_or_sleep() {
   done < <(recorded_windows)
 
   if [ "${#windows[@]}" -eq 0 ]; then
-    sleep "$POLL"
+    snooze "$POLL"
     return
   fi
 
@@ -671,7 +719,7 @@ event_wait_or_sleep() {
     _event_cap_fails=0
   fi
   if [ "$_event_cap_ok" != 1 ]; then
-    sleep "$POLL"
+    snooze "$POLL"
     return
   fi
 
@@ -688,7 +736,7 @@ event_wait_or_sleep() {
       # pure polling for the rest of this watcher process.
       _event_cap_fails=$((_event_cap_fails + 1))
       [ "$_event_cap_fails" -ge "$EVENT_CAP_FAIL_MAX" ] && _event_cap_ok=0
-      sleep "$POLL"
+      snooze "$POLL"
       ;;
     *)
       # 1: a clean full-budget wait with no actionable edge - the reader already
@@ -869,7 +917,7 @@ while :; do
   # signature for an already-pending file (last write wins below).
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
-    sleep "$SIGNAL_GRACE"
+    snooze "$SIGNAL_GRACE"
     pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
     files=""
     while IFS=$(printf '\t') read -r sf sig f; do
@@ -933,12 +981,25 @@ EOF
     if ! status_is_paused_or_captain_held "$last" && [ -e "$STATE/.paused-$key" ]; then
       clear_pause_tracking "$w"
     fi
-    if [ "$kind" = secondmate ] && ! status_is_paused "$last"; then
+    # A secondmate's endpoint is never pane-supervised: its idle pane is healthy
+    # by design and parent supervision relies on its routed status alone
+    # (AGENTS.md section 8), so even a declared pause is tracked through the
+    # status channel and the backlog, not a pane-stale cadence.
+    if [ "$kind" = secondmate ]; then
       continue
     fi
-    tail40=$(fm_backend_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")" 2>/dev/null) || continue
+    if ! tail40=$(fm_backend_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")" 2>/dev/null); then
+      # No pane to read. For a declared pause or captain-held transfer, keep
+      # the bounded recheck alive instead of silently dropping the window
+      # (handle_paused_gone_endpoint confirms agent death first); everything
+      # else keeps the historical silent skip.
+      if ! afk_present && status_is_paused_or_captain_held "$last"; then
+        handle_paused_gone_endpoint "$w" "$task"
+      fi
+      continue
+    fi
+    rm -f "$STATE/.paused-gone-$key"
     h=$(printf '%s' "$tail40" | hash_pane)
-    key=$(printf '%s' "$w" | tr ':/.' '___')
     hf="$STATE/.hash-$key"
     cf="$STATE/.count-$key"
     sf="$STATE/.stale-$key"
@@ -958,12 +1019,7 @@ EOF
       if [ "$n" -ge 2 ] && [ "$busy_now" -ne 0 ]; then
         # The pane is idle/stale at hash $h. Triage decides whether this wakes
         # firstmate. Detection itself is unchanged from above.
-        if [ "$kind" = secondmate ]; then
-          case "$(pause_state_class "$w" "$task")" in
-            paused) handle_paused_stale "$w" "$task" "$h" ;;
-            *)      clear_pause_tracking "$w" ;;
-          esac
-        elif afk_present; then
+        if afk_present; then
           # Daemon owns triage: one-shot per distinct stale hash, as before.
           if [ "$(cat "$sf" 2>/dev/null || true)" != "$h" ]; then
             fm_wake_append stale "$w" "stale: $w" || exit 1
