@@ -1834,7 +1834,58 @@ test_herdr_projection_teardown_retains_journal_when_close_unconfirmed() {
   pass "herdr projection teardown retains every record when post-close presence is unknown"
 }
 
+# A historical launch could write a crewmate's Claude lifecycle wiring into the
+# primary home's own settings.local.json, where teardown's whole-file removal
+# must never reach. Teardown therefore sweeps that file (see
+# bin/fm-claude-task-hook-cleanup.sh) after clearing state/<id>.meta, so the
+# finished task's entries go while a live crewmate's, the primary's own Stop
+# guard, and unrelated hooks stay.
+test_teardown_sweeps_leaked_primary_claude_task_hooks() {
+  local case_dir home settings rc
+  case_dir=$(make_case claude-hook-sweep)
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "fix the thing"
+  add_fork_with_pushed_branch "$case_dir"
+
+  home="$case_dir/fm-home"
+  mkdir -p "$home/.claude"
+  : > "$case_dir/state/live-task.meta"
+  settings="$home/.claude/settings.local.json"
+  # $q is the shell quote the real hook commands carry around their arguments;
+  # spelling it as a jq arg keeps this program readable inside single quotes.
+  jq -n --arg state "$case_dir/state" --arg q "'" '
+    def busy($id): "\($q)/opt/fm/bin/fm-busy-event.sh\($q) apply \($q)\($state)\($q) \($q)\($id)\($q) busy --source claude-hook";
+    {hooks: {
+      UserPromptSubmit: [
+        {hooks: [{type: "command", command: busy("task-x1")}]},
+        {hooks: [{type: "command", command: busy("live-task")}]}
+      ],
+      Stop: [
+        {hooks: [{type: "command", command: "touch \($q)\($state)/task-x1.turn-ended\($q)"}]},
+        {hooks: [{type: "command", command: "bash bin/fm-claude-stop-autoarm.sh"}]}
+      ],
+      PreToolUse: [{hooks: [{type: "command", command: "bash bin/fm-arm-pretool-check.sh"}]}]
+    }}' > "$settings"
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "claude-hook-sweep: teardown should succeed for landed local-only work"
+
+  jq -e '(.hooks.UserPromptSubmit | length == 1)
+         and (.hooks.UserPromptSubmit[0].hooks[0].command | contains("live-task"))' "$settings" >/dev/null \
+    || fail "teardown did not sweep the torn-down task's busy hook (or dropped the live crewmate's)"
+  jq -e '(.hooks.Stop | length == 1)
+         and (.hooks.Stop[0].hooks[0].command == "bash bin/fm-claude-stop-autoarm.sh")' "$settings" >/dev/null \
+    || fail "teardown did not sweep the torn-down task's turn-ended hook, or lost the primary Stop guard"
+  jq -e '.hooks.PreToolUse[0].hooks[0].command == "bash bin/fm-arm-pretool-check.sh"' "$settings" >/dev/null \
+    || fail "teardown removed an unrelated primary hook"
+  pass "teardown sweeps leaked primary Claude task hooks and retains live, guard, and unrelated hooks"
+}
+
 test_local_only_fork_remote_allows
+test_teardown_sweeps_leaked_primary_claude_task_hooks
 test_teardown_prompts_tasks_axi_done_when_compatible
 test_teardown_manual_backend_prompts_hand_edit_even_when_tasks_axi_present
 test_local_only_truly_unpushed_refuses
