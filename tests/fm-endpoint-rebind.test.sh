@@ -6,11 +6,68 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 file_mode() {  # <path>
-  if [ "$(uname)" = Darwin ]; then
-    stat -f %Lp "$1"
-  else
-    stat -c %a "$1"
-  fi
+  local mode
+  mode=$(stat -f %Lp "$1" 2>/dev/null) || mode=
+  case "$mode" in
+    ''|*[!0-7]*) mode=$(stat -c %a "$1" 2>/dev/null) || mode= ;;
+  esac
+  case "$mode" in
+    ''|*[!0-7]*) return 1 ;;
+  esac
+  printf '%s\n' "$mode"
+}
+
+# Install a single-flavor stat (and a contradicting uname) so the repair's mode
+# read is exercised against a host whose stat syntax the OS name would mispick.
+install_stat_flavor() {  # <case> <bsd|gnu|broken>
+  local dir=$1 flavor=$2 fakebin
+  fakebin=$(fm_fakebin "$dir")
+  case "$flavor" in
+    bsd)
+      cat > "$fakebin/uname" <<'SH'
+#!/usr/bin/env bash
+printf 'Linux\n'
+SH
+      cat > "$fakebin/stat" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${FM_STAT_LOG:?}"
+case "$1 $2" in
+  '-f %Lp') printf '644\n' ;;
+  -c\ *) printf 'stat: illegal option -- c\n' >&2; exit 1 ;;
+  *) exit 2 ;;
+esac
+SH
+      ;;
+    gnu)
+      cat > "$fakebin/uname" <<'SH'
+#!/usr/bin/env bash
+printf 'Darwin\n'
+SH
+      cat > "$fakebin/stat" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${FM_STAT_LOG:?}"
+case "$1 $2" in
+  '-c %a') printf '644\n' ;;
+  -f\ *)
+    printf '  File: "%s"\nBlocks: Total: 1\n' "$2"
+    exit 1
+    ;;
+  *) exit 2 ;;
+esac
+SH
+      ;;
+    broken)
+      cat > "$fakebin/stat" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${FM_STAT_LOG:?}"
+printf 'stat: cannot read file mode\n' >&2
+exit 1
+SH
+      ;;
+    *) fail "unknown stat flavor $flavor" ;;
+  esac
+  chmod +x "$fakebin/stat"
+  [ ! -e "$fakebin/uname" ] || chmod +x "$fakebin/uname"
 }
 
 REBIND="$ROOT/bin/fm-endpoint-rebind.sh"
@@ -277,8 +334,38 @@ test_live_endpoint_change_between_snapshots_refuses() {
   pass "endpoint re-binding: live endpoint state that changes between snapshots is ambiguity, not repair authority"
 }
 
+test_metadata_mode_survives_either_stat_flavor() {
+  local dir output flavor
+  for flavor in bsd gnu; do
+    dir=$(make_case "stat-$flavor")
+    seed_legacy_meta "$dir"
+    install_stat_flavor "$dir" "$flavor"
+    chmod 0644 "$dir/home/state/legacy-task.meta"
+    output=$(FM_STAT_LOG="$dir/stat.log" run_rebind "$dir") \
+      || fail "$flavor stat flavor blocked an otherwise verified repair"
+    assert_contains "$output" 'verified endpoint binding recorded for task legacy-task' \
+      "$flavor stat flavor did not publish the verified binding"
+    [ "$(file_mode "$dir/home/state/legacy-task.meta")" = 644 ] \
+      || fail "$flavor stat flavor did not preserve the metadata file mode"
+  done
+  assert_grep '-f %Lp' "$TMP_ROOT/stat-bsd/stat.log" \
+    "BSD-only stat host never received a BSD-syntax mode read"
+  assert_no_grep '-c ' "$TMP_ROOT/stat-bsd/stat.log" \
+    "BSD-only stat host was asked for a GNU-syntax mode"
+  assert_grep '-c %a' "$TMP_ROOT/stat-gnu/stat.log" \
+    "GNU-only stat host never received a GNU-syntax mode read"
+
+  dir=$(make_case stat-unreadable)
+  seed_legacy_meta "$dir"
+  install_stat_flavor "$dir" broken
+  FM_STAT_LOG="$dir/stat.log" assert_rebind_refused_unchanged "$dir" "unreadable metadata file mode" \
+    'file mode of endpoint metadata for task legacy-task could not be read'
+  pass "endpoint re-binding: the published mode follows the installed stat flavor, not the OS name, and an unreadable mode refuses"
+}
+
 test_verified_live_identity_is_published
 test_existing_valid_binding_is_idempotent
+test_metadata_mode_survives_either_stat_flavor
 test_live_endpoint_change_between_snapshots_refuses
 test_wrong_live_evidence_refuses_without_mutation
 test_competing_metadata_claim_refuses_before_runtime_read

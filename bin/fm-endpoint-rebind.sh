@@ -123,12 +123,20 @@ WORKTREE_REAL=$(CDPATH='' cd -- "$WORKTREE" 2>/dev/null && pwd -P) || {
   exit 1
 }
 
+# Read one octal file mode from whichever stat flavor this host actually has,
+# probed by trying BSD syntax and accepting only a well-formed octal answer.
+# GNU coreutils can shadow BSD stat (and the reverse), so the installed flavor
+# is not derivable from the OS name.
 legacy_endpoint_file_mode() {  # <file>
-  if [ "$(uname)" = Darwin ]; then
-    stat -f %Lp "$1" 2>/dev/null
-  else
-    stat -c %a "$1" 2>/dev/null
-  fi
+  local mode
+  mode=$(stat -f %Lp "$1" 2>/dev/null) || mode=
+  case "$mode" in
+    ''|*[!0-7]*) mode=$(stat -c %a "$1" 2>/dev/null) || mode= ;;
+  esac
+  case "$mode" in
+    ''|*[!0-7]*) return 1 ;;
+  esac
+  printf '%s\n' "$mode"
 }
 
 legacy_endpoint_has_competing_claim() {
