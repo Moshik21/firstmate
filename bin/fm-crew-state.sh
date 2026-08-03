@@ -16,7 +16,7 @@
 # fixed mapping logic, no heuristics and no LLM. Output is one stable, parseable,
 # token-tight line firstmate can read every heartbeat:
 #
-#   state: <working|parked|done|blocked|paused|failed|unknown> · source: <run-step|pane|status-log|none> · <detail>
+#   state: <working|parked|awaiting-validation-trigger|done|blocked|paused|failed|unknown> · source: <run-step|pane|status-log|none> · <detail>
 #
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta.
@@ -40,9 +40,11 @@
 #      is flagged superseded. A genuinely parked run plus a needs-decision log
 #      agree, and are reported as parked.
 #   4. No run for this crew (pre-validation, or kind=scout): fall back to the
-#      recorded backend's pane busy state, then the status log's last line only
-#      when its verb maps to a recognized run-state. Decision-only events such as
-#      `resolved` never become current state or detail.
+#      recorded backend's pane busy state. An idle no-mistakes ship whose last
+#      event is implementation `done:` and whose metadata has no PR is awaiting
+#      firstmate's validation trigger, not done. Other idle tasks fall back to the
+#      status log's last line only when its verb maps to a recognized run-state.
+#      Decision-only events such as `resolved` never become current state or detail.
 #   5. Missing meta or torn-down worktree: report unknown · none. If no run is
 #      attributed to this crew, a dead endpoint also reports unknown · none rather
 #      than trusting a stale status log.
@@ -99,6 +101,8 @@ meta_value() {  # <key>
 WT=$(meta_value worktree)
 KIND=$(meta_value kind)
 HARNESS=$(meta_value harness)
+MODE=$(meta_value mode)
+PR=$(meta_value pr)
 [ -n "$KIND" ] || KIND=ship
 
 # A torn-down (or never-created) worktree has no current state to read.
@@ -183,7 +187,9 @@ strip_quotes() {
   trim "$s"
 }
 
-# Bounded no-mistakes call in the worktree; stdout only, never fails the script.
+# Bounded no-mistakes call in the worktree. Stdout is the data channel and the
+# return code distinguishes a completed empty answer from a timeout or CLI error,
+# so absence of a run is never inferred from an unavailable lookup.
 HAVE_TIMEOUT=none
 if command -v timeout >/dev/null 2>&1; then HAVE_TIMEOUT=timeout
 elif command -v gtimeout >/dev/null 2>&1; then HAVE_TIMEOUT=gtimeout
@@ -191,10 +197,10 @@ elif command -v perl >/dev/null 2>&1; then HAVE_TIMEOUT=perl
 fi
 nm_run() {  # <args...>
   case "$HAVE_TIMEOUT" in
-    timeout)  ( cd "$WT" && timeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null || true ;;
-    gtimeout) ( cd "$WT" && gtimeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null || true ;;
-    perl)     ( cd "$WT" && perl -e 'my $t = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0); exec @ARGV } local $SIG{ALRM} = sub { kill "TERM", -$pid; select undef, undef, undef, 0.2; kill "KILL", -$pid; exit 124 }; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null || true ;;
-    *)        true ;;
+    timeout)  ( cd "$WT" && timeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ;;
+    gtimeout) ( cd "$WT" && gtimeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ;;
+    perl)     ( cd "$WT" && perl -e 'my $t = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0); exec @ARGV } local $SIG{ALRM} = sub { kill "TERM", -$pid; select undef, undef, undef, 0.2; kill "KILL", -$pid; exit 124 }; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ;;
+    *)        return 1 ;;
   esac
 }
 
@@ -355,8 +361,8 @@ nm_ci_checks_state() {
 # when the branch has no run within FM_CREW_STATE_RUNS_LIMIT rows.
 nm_runs_status_for_branch() {  # <branch>
   local branch=$1 out row st rest br sha
-  out=$(nm_run runs --limit "$FM_CREW_STATE_RUNS_LIMIT")
-  [ -n "$out" ] || return 0
+  out=$(nm_run runs --limit "$FM_CREW_STATE_RUNS_LIMIT") || return 2
+  [ -n "$out" ] || return 1
   while IFS= read -r row; do
     row=$(trim "$row")
     [ -n "$row" ] || continue
@@ -377,7 +383,7 @@ nm_runs_status_for_branch() {  # <branch>
       return 0
     fi
   done <<< "$out"
-  return 0
+  return 1
 }
 
 # CREW_BRANCH is empty at detached HEAD (a just-spawned crew, or a scout's
@@ -422,6 +428,11 @@ nm_coarse_head_matches_worktree() {  # <short-sha>
 }
 
 HAVE_RUN=0
+# RUN_LOOKUP_COMPLETE is positive only when the CLI answered enough to prove
+# either that a matching run exists or that the bounded runs list has no match.
+# A timeout or CLI failure remains unknown and cannot create a pending-trigger
+# verdict that might conflict with a genuinely active validation run.
+RUN_LOOKUP_COMPLETE=0
 # RUN_SOURCE distinguishes the two ways HAVE_RUN=1 can happen: "full" means
 # $RUN_OUT is real `axi status` TOON with step/gate detail; "coarse" means only
 # a bare status word came back from the runs-list fallback above, so the
@@ -431,23 +442,22 @@ COARSE_STATUS=""
 # Scouts and secondmates never drive a no-mistakes validation of their own
 # worktree, so skip the lookup for them and read state from pane/log directly.
 if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/null 2>&1; then
-  RUN_OUT=$(nm_run axi status)
-  if [ -n "$RUN_OUT" ]; then
+  if RUN_OUT=$(nm_run axi status); then
     run_branch=$(strip_quotes "$(nm_field branch)")
     if [ -n "$run_branch" ] && [ "$run_branch" = "$CREW_BRANCH" ] && nm_run_head_matches_worktree; then
       HAVE_RUN=1
+      RUN_LOOKUP_COMPLETE=1
     else
-      # The active-or-most-recent run is for another branch, or same branch with
-      # a rewritten/diverged head (the CLI is alive and answered; only the
-      # attribution missed) - try the coarse fallback.
-      # Deliberately nested inside `[ -n "$RUN_OUT" ]`: an empty/timed-out
-      # primary call means the CLI itself did not respond, so retrying it
-      # immediately with a second bounded call would just double the wait
-      # for no better answer.
-      COARSE_STATUS=$(nm_runs_status_for_branch "$CREW_BRANCH")
-      if [ -n "$COARSE_STATUS" ]; then
+      # The active-or-most-recent run is for another branch, absent, or bound to
+      # a rewritten/diverged head. The completed primary read permits one bounded
+      # coarse lookup to distinguish no matching run from a lookup failure.
+      if COARSE_STATUS=$(nm_runs_status_for_branch "$CREW_BRANCH"); then
         HAVE_RUN=1
         RUN_SOURCE=coarse
+        RUN_LOOKUP_COMPLETE=1
+      else
+        coarse_rc=$?
+        [ "$coarse_rc" -eq 1 ] && RUN_LOOKUP_COMPLETE=1
       fi
     fi
   fi
@@ -591,6 +601,18 @@ if [ "$KIND" != secondmate ]; then
     idle) ;;
     *) emit unknown pane "harness state unavailable ($BUSY_VERDICT)" ;;
   esac
+fi
+
+# A no-mistakes ship deliberately stops after reporting its committed
+# implementation `done:` and waits for firstmate to start validation on that same
+# worker. Reaching this point proves no active or terminal run is attributable to
+# the current code, and the idle verdict above proves the healthy worker is
+# correctly waiting rather than still implementing. Keep this distinct from done
+# until either a run accounts for the code or PR metadata is recorded. Other
+# delivery modes and kinds intentionally finish without this handoff.
+if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ] && [ -z "$PR" ] \
+  && [ "$LOG_VERB" = "done" ] && [ "$RUN_LOOKUP_COMPLETE" = 1 ]; then
+  emit awaiting-validation-trigger status-log "implementation committed; firstmate must trigger no-mistakes validation"
 fi
 
 # Fall back to the status log's last line, but ONLY when its verb maps to a real

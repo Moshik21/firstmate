@@ -25,6 +25,9 @@
 #       This is the direct regression pair for the 2026-07-02 herdr incident,
 #       proving the watcher's own absorb-only-when-provably-working predicate
 #       benefits from the fix in both directions.
+#   (l) committed no-mistakes implementation awaiting firstmate's validation
+#       trigger is distinct from done, without affecting other modes, scouts,
+#       tasks with an attributable run, or tasks with a recorded PR.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -783,6 +786,109 @@ EOF
   pass "another branch's run is ignored, falls back"
 }
 
+# (l) A no-mistakes ship that correctly stopped after reporting its committed
+# implementation must make firstmate's pending validation trigger explicit.
+test_no_mistakes_done_awaits_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case awaiting-validation-trigger)
+  make_repo_on_branch "$d/wt" fm/feat-awaiting-validation
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-awaiting-validation.meta" \
+    "window=fm:fm-feat-awaiting-validation" "worktree=$d/wt" "kind=ship" \
+    "mode=no-mistakes" "harness=claude"
+  printf 'done: implementation committed on the task branch\n' > "$d/state/feat-awaiting-validation.status"
+  FM_FAKE_AXI_STATUS=""
+  FM_FAKE_RUNS_LIST=""
+  arm_idle_record "$d/state" feat-awaiting-validation
+  local out; out=$(run_crew_state "$d" feat-awaiting-validation)
+  assert_contains "$out" "state: awaiting-validation-trigger" \
+    "a committed no-mistakes implementation must expose firstmate's pending trigger"
+  assert_contains "$out" "source: status-log" "the pending handoff is grounded in the implementation done event"
+  assert_contains "$out" "firstmate must trigger no-mistakes validation" "the pending action is explicit"
+  assert_not_contains "$out" "state: done" "the untriggered implementation must not read as lifecycle-complete"
+  pass "a committed no-mistakes implementation exposes the pending validation trigger"
+}
+
+# direct-PR and local-only intentionally finish without a no-mistakes run.
+test_non_pipeline_modes_done_do_not_await_validation_trigger() {
+  local mode d id out
+  for mode in direct-PR local-only; do
+    reset_fakes
+    id="done-${mode}"
+    d=$(new_case "$id")
+    make_repo_on_branch "$d/wt" "fm/$id"
+    make_fakebin "$d" >/dev/null
+    fm_write_meta "$d/state/$id.meta" "window=fm:fm-$id" "worktree=$d/wt" \
+      "kind=ship" "mode=$mode" "harness=claude"
+    printf 'done: delivery contract complete\n' > "$d/state/$id.status"
+    arm_idle_record "$d/state" "$id"
+    out=$(run_crew_state "$d" "$id")
+    assert_contains "$out" "state: done" "$mode completion must remain done"
+    assert_not_contains "$out" "awaiting-validation-trigger" "$mode must not acquire a pipeline handoff"
+  done
+  pass "direct-PR and local-only completion never acquire a validation-trigger handoff"
+}
+
+# A scout's report is its deliverable and never requires a PR pipeline.
+test_scout_done_does_not_await_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case scout-done-no-trigger)
+  make_repo_on_branch "$d/wt" fm/scout-done-no-trigger
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/scout-done-no-trigger.meta" \
+    "window=fm:fm-scout-done-no-trigger" "worktree=$d/wt" "kind=scout" \
+    "mode=no-mistakes" "harness=claude"
+  printf 'done: report written\n' > "$d/state/scout-done-no-trigger.status"
+  arm_idle_record "$d/state" scout-done-no-trigger
+  local out; out=$(run_crew_state "$d" scout-done-no-trigger)
+  assert_contains "$out" "state: done" "scout completion must remain done"
+  assert_not_contains "$out" "awaiting-validation-trigger" "a scout must not acquire a PR handoff"
+  pass "scout completion never acquires a validation-trigger handoff"
+}
+
+# Any attributable active or terminal validation run already accounts for the
+# implementation done event and remains authoritative.
+test_validation_run_does_not_await_validation_trigger() {
+  local phase d id out
+  for phase in active terminal; do
+    reset_fakes
+    id="validation-${phase}"
+    d=$(new_case "$id")
+    make_repo_on_branch "$d/wt" "fm/$id"
+    make_fakebin "$d" >/dev/null
+    fm_write_meta "$d/state/$id.meta" "window=fm:fm-$id" "worktree=$d/wt" \
+      "kind=ship" "mode=no-mistakes" "harness=claude"
+    printf 'done: implementation committed on the task branch\n' > "$d/state/$id.status"
+    if [ "$phase" = active ]; then
+      FM_FAKE_AXI_STATUS="$(run_running "fm/$id")"
+    else
+      FM_FAKE_AXI_STATUS="$(run_passed "fm/$id")"
+    fi
+    out=$(run_crew_state "$d" "$id")
+    assert_contains "$out" "source: run-step" "$phase validation run must stay authoritative"
+    assert_not_contains "$out" "awaiting-validation-trigger" "$phase validation run already accounts for the handoff"
+  done
+  pass "active and terminal validation runs suppress the pending-trigger state"
+}
+
+# Recorded PR metadata proves the task advanced beyond the pre-validation handoff
+# even when no run can currently be attributed.
+test_recorded_pr_does_not_await_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case recorded-pr-no-trigger)
+  make_repo_on_branch "$d/wt" fm/recorded-pr-no-trigger
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/recorded-pr-no-trigger.meta" \
+    "window=fm:fm-recorded-pr-no-trigger" "worktree=$d/wt" "kind=ship" \
+    "mode=no-mistakes" "harness=claude" "pr=https://github.com/o/r/pull/9"
+  printf 'done: implementation committed on the task branch\n' > "$d/state/recorded-pr-no-trigger.status"
+  arm_idle_record "$d/state" recorded-pr-no-trigger
+  local out; out=$(run_crew_state "$d" recorded-pr-no-trigger)
+  assert_contains "$out" "state: done" "a task with a recorded PR remains done without an attributable run"
+  assert_not_contains "$out" "awaiting-validation-trigger" "recorded PR metadata closes the pre-validation handoff"
+  pass "a recorded PR suppresses the pending validation-trigger state"
+}
+
 # (f) no run for this crew + a busy pane -> working via pane
 test_no_run_busy_pane() {
   reset_fakes
@@ -1333,6 +1439,11 @@ test_cross_branch_attribution_via_runs_list
 test_cross_branch_attribution_picks_most_recent_row
 test_coarse_run_does_not_probe_other_branch_ci_log_for_ready_status
 test_other_branch_run_ignored
+test_no_mistakes_done_awaits_validation_trigger
+test_non_pipeline_modes_done_do_not_await_validation_trigger
+test_scout_done_does_not_await_validation_trigger
+test_validation_run_does_not_await_validation_trigger
+test_recorded_pr_does_not_await_validation_trigger
 test_no_run_busy_pane
 test_no_run_footer_text_alone_is_not_working
 test_no_run_grok_uses_isolated_fallback
