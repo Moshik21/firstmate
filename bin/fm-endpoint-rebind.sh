@@ -95,9 +95,8 @@ backend=$(fm_backend_meta_exact_value "$META" backend 2>/dev/null || true)
   exit 1
 }
 
-umask 077
-SNAPSHOT=$(mktemp "$STATE/.$ID.endpoint-rebind-source.XXXXXX") || exit 1
-CANDIDATE=$(mktemp "$STATE/.$ID.endpoint-rebind-candidate.XXXXXX") || exit 1
+SNAPSHOT=$(umask 077; mktemp "$STATE/.$ID.endpoint-rebind-source.XXXXXX") || exit 1
+CANDIDATE=$(umask 077; mktemp "$STATE/.$ID.endpoint-rebind-candidate.XXXXXX") || exit 1
 cp -- "$META" "$SNAPSHOT"
 cmp -s "$SNAPSHOT" "$META" || {
   echo "REFUSED: endpoint metadata for task $ID changed while it was being read; preserving task state." >&2
@@ -122,6 +121,14 @@ WORKTREE=$(fm_backend_meta_exact_value "$CANDIDATE" worktree)
 WORKTREE_REAL=$(CDPATH='' cd -- "$WORKTREE" 2>/dev/null && pwd -P) || {
   echo "REFUSED: recorded Herdr worktree for task $ID is absent or unreadable; preserving task state." >&2
   exit 1
+}
+
+legacy_endpoint_file_mode() {  # <file>
+  if [ "$(uname)" = Darwin ]; then
+    stat -f %Lp "$1" 2>/dev/null
+  else
+    stat -c %a "$1" 2>/dev/null
+  fi
 }
 
 legacy_endpoint_has_competing_claim() {
@@ -172,6 +179,17 @@ if [ ! -f "$META" ] || [ -L "$META" ] || ! cmp -s "$SNAPSHOT" "$META"; then
   exit 1
 fi
 
+META_MODE=$(legacy_endpoint_file_mode "$META") || META_MODE=
+case "$META_MODE" in
+  ''|*[!0-7]*)
+    echo "REFUSED: file mode of endpoint metadata for task $ID could not be read; preserving task state." >&2
+    exit 1
+    ;;
+esac
+chmod "$META_MODE" "$CANDIDATE" || {
+  echo "REFUSED: repaired endpoint metadata for task $ID could not keep the recorded file mode; preserving task state." >&2
+  exit 1
+}
 mv -f -- "$CANDIDATE" "$META"
 CANDIDATE=
 printf 'verified endpoint binding recorded for task %s\n' "$ID"

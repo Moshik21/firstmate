@@ -2309,6 +2309,7 @@ fm_backend_herdr_task_binding_snapshot_matches() {  # <session> <workspace-id> <
 fm_backend_herdr_verify_task_binding() {  # <session> <workspace-id> <tab-id> <pane-id> <task-id> <worktree>
   local session=$1 workspace=$2 tab=$3 pane=$4 id=$5 worktree=$6 canonical_worktree
   local workspaces tabs panes
+  fm_backend_herdr_tool_check || return 1
   canonical_worktree=$(CDPATH='' cd -- "$worktree" 2>/dev/null && pwd -P) || {
     echo "REFUSED: recorded Herdr worktree for task $id is absent or unreadable; preserving task state." >&2
     return 1

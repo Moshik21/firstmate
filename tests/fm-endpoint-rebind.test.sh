@@ -5,6 +5,14 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+file_mode() {  # <path>
+  if [ "$(uname)" = Darwin ]; then
+    stat -f %Lp "$1"
+  else
+    stat -c %a "$1"
+  fi
+}
+
 REBIND="$ROOT/bin/fm-endpoint-rebind.sh"
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 TMP_ROOT=$(fm_test_tmproot fm-endpoint-rebind)
@@ -27,9 +35,17 @@ case "$cmd $sub" in
       : > "$FM_FAKE_MUTATE_MARKER"
       printf 'note=changed-during-proof\n' >> "$FM_FAKE_MUTATE_META"
     fi
+    cwd=${FM_FAKE_CWD:?}
+    if [ -n "${FM_FAKE_DRIFT_CWD:-}" ]; then
+      if [ -e "${FM_FAKE_DRIFT_MARKER:?}" ]; then
+        cwd=$FM_FAKE_DRIFT_CWD
+      else
+        : > "$FM_FAKE_DRIFT_MARKER"
+      fi
+    fi
     printf '{"result":{"pane":{"pane_id":"%s","tab_id":"%s","workspace_id":"%s","foreground_cwd":"%s"}}}\n' \
       "${FM_FAKE_PANE:-w1:p2}" "${FM_FAKE_PANE_TAB:-w1:t2}" \
-      "${FM_FAKE_PANE_WORKSPACE:-w1}" "${FM_FAKE_CWD:?}"
+      "${FM_FAKE_PANE_WORKSPACE:-w1}" "$cwd"
     ;;
   'tab get')
     printf '{"result":{"tab":{"tab_id":"%s","workspace_id":"%s","label":"%s"}}}\n' \
@@ -82,8 +98,8 @@ run_rebind() {  # <case> [id]
     "$REBIND" "$id"
 }
 
-assert_rebind_refused_unchanged() {  # <case> <description>
-  local dir=$1 description=$2 before rc
+assert_rebind_refused_unchanged() {  # <case> <description> <expected-refusal>
+  local dir=$1 description=$2 expected=$3 before rc
   before="$dir/before.meta"
   cp "$dir/home/state/legacy-task.meta" "$before"
   set +e
@@ -91,6 +107,8 @@ assert_rebind_refused_unchanged() {  # <case> <description>
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "$description: re-binding unexpectedly succeeded"
+  assert_grep "$expected" "$dir/stderr" \
+    "$description: refusal did not report the expected reason"
   cmp -s "$before" "$dir/home/state/legacy-task.meta" \
     || fail "$description: refused repair changed metadata"
   assert_no_grep 'endpoint_task_id=' "$dir/home/state/legacy-task.meta" \
@@ -103,6 +121,7 @@ test_verified_live_identity_is_published() {
   seed_legacy_meta "$dir"
   legacy=$(cat "$dir/home/state/legacy-task.meta")
   printf '%s' "$legacy" > "$dir/home/state/legacy-task.meta"
+  chmod 0644 "$dir/home/state/legacy-task.meta"
   set +e
   FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_HERDR_LOG="$dir/herdr.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" legacy-task --force \
@@ -129,6 +148,8 @@ test_verified_live_identity_is_published() {
     || fail "published metadata does not pass the unchanged teardown validator"
   [ "$(wc -l < "$dir/herdr.log" | tr -d '[:space:]')" -eq 7 ] \
     || fail "successful repair did not perform the bounded live proof"
+  [ "$(file_mode "$dir/home/state/legacy-task.meta")" = 644 ] \
+    || fail "successful repair did not preserve the metadata file mode"
   pass "endpoint re-binding: exact live Herdr identity and worktree proof publishes one teardown-valid binding"
 }
 
@@ -147,20 +168,24 @@ test_wrong_live_evidence_refuses_without_mutation() {
   local dir
   dir=$(make_case wrong-label)
   seed_legacy_meta "$dir"
-  FM_FAKE_LABEL=fm-other-task assert_rebind_refused_unchanged "$dir" "wrong task label"
+  FM_FAKE_LABEL=fm-other-task assert_rebind_refused_unchanged "$dir" "wrong task label" \
+    'live Herdr pane, task label, or worktree does not exactly match task legacy-task'
 
   dir=$(make_case wrong-cwd)
   seed_legacy_meta "$dir"
   mkdir -p "$dir/other-worktree"
-  FM_FAKE_CWD="$dir/other-worktree" assert_rebind_refused_unchanged "$dir" "wrong live worktree"
+  FM_FAKE_CWD="$dir/other-worktree" assert_rebind_refused_unchanged "$dir" "wrong live worktree" \
+    'live Herdr pane, task label, or worktree does not exactly match task legacy-task'
 
   dir=$(make_case wrong-relation)
   seed_legacy_meta "$dir"
-  FM_FAKE_PANE_TAB=w1:t9 assert_rebind_refused_unchanged "$dir" "wrong pane-to-tab relationship"
+  FM_FAKE_PANE_TAB=w1:t9 assert_rebind_refused_unchanged "$dir" "wrong pane-to-tab relationship" \
+    'live Herdr pane, task label, or worktree does not exactly match task legacy-task'
 
   dir=$(make_case duplicate-label)
   seed_legacy_meta "$dir"
-  FM_FAKE_DUPLICATE_LABEL=1 assert_rebind_refused_unchanged "$dir" "duplicate task label"
+  FM_FAKE_DUPLICATE_LABEL=1 assert_rebind_refused_unchanged "$dir" "duplicate task label" \
+    'Herdr task tab for task legacy-task is absent, duplicated, or relabeled'
   pass "endpoint re-binding: relabeled, moved, contradictory, and duplicate live Herdr evidence is preserved and refused"
 }
 
@@ -172,7 +197,8 @@ test_competing_metadata_claim_refuses_before_runtime_read() {
     'window=lab:w1:p2' "worktree=$dir/other" "project=$dir/project" \
     'backend=herdr' 'herdr_session=lab' 'herdr_workspace_id=w1' \
     'herdr_tab_id=w1:t2' 'herdr_pane_id=w1:p2'
-  assert_rebind_refused_unchanged "$dir" "competing task metadata"
+  assert_rebind_refused_unchanged "$dir" "competing task metadata" \
+    'task other-task also claims the recorded Herdr endpoint for task legacy-task'
   [ ! -s "$dir/herdr.log" ] || fail "competing metadata claim reached the runtime"
 
   dir=$(make_case competing-worktree-alias)
@@ -182,7 +208,8 @@ test_competing_metadata_claim_refuses_before_runtime_read() {
     'window=lab:w9:p9' "worktree=$dir/worktree-alias" "project=$dir/project" \
     'backend=herdr' 'herdr_session=lab' 'herdr_workspace_id=w9' \
     'herdr_tab_id=w9:t9' 'herdr_pane_id=w9:p9'
-  assert_rebind_refused_unchanged "$dir" "competing canonical worktree metadata"
+  assert_rebind_refused_unchanged "$dir" "competing canonical worktree metadata" \
+    'task other-task also claims the recorded worktree for task legacy-task'
   [ ! -s "$dir/herdr.log" ] || fail "canonical worktree collision reached the runtime"
   pass "endpoint re-binding: another task's endpoint or canonical worktree claim refuses before any Herdr read"
 }
@@ -197,6 +224,8 @@ test_invalid_legacy_metadata_refuses_before_runtime_read() {
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "empty existing binding unexpectedly repaired"
+  assert_grep 'task legacy-task has an empty endpoint task binding' "$dir/stderr" \
+    "empty existing binding did not report the expected reason"
   [ ! -s "$dir/herdr.log" ] || fail "empty existing binding reached the runtime"
 
   dir=$(make_case malformed-shape)
@@ -204,14 +233,16 @@ test_invalid_legacy_metadata_refuses_before_runtime_read() {
   awk '{ sub(/^window=.*/, "window=lab:w1:p9"); print }' \
     "$dir/home/state/legacy-task.meta" > "$dir/new"
   mv "$dir/new" "$dir/home/state/legacy-task.meta"
-  assert_rebind_refused_unchanged "$dir" "inconsistent Herdr metadata"
+  assert_rebind_refused_unchanged "$dir" "inconsistent Herdr metadata" \
+    'Herdr endpoint metadata for task legacy-task is malformed or inconsistent'
   [ ! -s "$dir/herdr.log" ] || fail "inconsistent Herdr metadata reached the runtime"
 
   dir=$(make_case non-herdr)
   seed_legacy_meta "$dir"
   awk '$0 != "backend=herdr"' "$dir/home/state/legacy-task.meta" > "$dir/new"
   mv "$dir/new" "$dir/home/state/legacy-task.meta"
-  assert_rebind_refused_unchanged "$dir" "non-Herdr metadata"
+  assert_rebind_refused_unchanged "$dir" "non-Herdr metadata" \
+    'verified legacy endpoint re-binding currently supports Herdr metadata only'
   [ ! -s "$dir/herdr.log" ] || fail "non-Herdr metadata reached the runtime"
   pass "endpoint re-binding: malformed bindings, inconsistent shapes, and non-Herdr records refuse before runtime access"
 }
@@ -234,8 +265,21 @@ test_metadata_change_during_proof_is_not_overwritten() {
   pass "endpoint re-binding: source-byte changes during live proof refuse instead of overwriting newer metadata"
 }
 
+test_live_endpoint_change_between_snapshots_refuses() {
+  local dir
+  dir=$(make_case drifted-endpoint)
+  seed_legacy_meta "$dir"
+  mkdir -p "$dir/other-worktree"
+  FM_FAKE_DRIFT_CWD="$dir/other-worktree" FM_FAKE_DRIFT_MARKER="$dir/drifted" \
+    assert_rebind_refused_unchanged "$dir" "live endpoint changed between snapshots" \
+    'live Herdr endpoint for task legacy-task changed during ownership verification'
+  [ -e "$dir/drifted" ] || fail "live endpoint drift case never reached the first live snapshot"
+  pass "endpoint re-binding: live endpoint state that changes between snapshots is ambiguity, not repair authority"
+}
+
 test_verified_live_identity_is_published
 test_existing_valid_binding_is_idempotent
+test_live_endpoint_change_between_snapshots_refuses
 test_wrong_live_evidence_refuses_without_mutation
 test_competing_metadata_claim_refuses_before_runtime_read
 test_invalid_legacy_metadata_refuses_before_runtime_read
