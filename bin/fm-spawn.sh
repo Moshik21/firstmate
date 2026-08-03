@@ -1282,6 +1282,39 @@ validate_spawn_worktree() {  # <source> <inspect-target>
   fi
 }
 
+validate_claude_task_hook_install_location() {  # Refuse primary or redirected settings writes.
+  local wt_real home_real hook_dir hook_dir_real settings
+  wt_real=$(cd "$WT" 2>/dev/null && pwd -P) || {
+    echo "error: cannot resolve Claude task hook worktree '$WT'" >&2
+    exit 1
+  }
+  home_real=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || {
+    echo "error: cannot resolve primary home '$FM_HOME' before installing Claude task hooks" >&2
+    exit 1
+  }
+  if [ "$wt_real" = "$home_real" ]; then
+    echo "error: refusing to install Claude task hooks in the primary home '$FM_HOME'" >&2
+    exit 1
+  fi
+  hook_dir="$WT/.claude"
+  mkdir -p "$hook_dir"
+  hook_dir_real=$(cd "$hook_dir" 2>/dev/null && pwd -P) || {
+    echo "error: cannot resolve Claude task hook directory '$hook_dir'" >&2
+    exit 1
+  }
+  if [ "$hook_dir_real" != "$wt_real/.claude" ]; then
+    echo "error: refusing redirected Claude task hook directory '$hook_dir'" >&2
+    exit 1
+  fi
+  settings="$hook_dir/settings.local.json"
+  if [ -e "$settings" ] || [ -L "$settings" ]; then
+    [ -f "$settings" ] && [ ! -L "$settings" ] || {
+      echo "error: refusing unsafe Claude task hook settings path '$settings'" >&2
+      exit 1
+    }
+  fi
+}
+
 herdr_projection_meta_field_exact() {  # <meta> <key>
   local meta=$1 key=$2 count
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
@@ -1802,7 +1835,7 @@ if [ "$KIND" != secondmate ]; then
       # turn-ended NOTIFICATION touch for the watcher. Every hook command
       # tolerates a refused event (|| true) so a stale-gen writer can never
       # break Claude's own lifecycle.
-      mkdir -p "$WT/.claude"
+      validate_claude_task_hook_install_location
       busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
       busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source claude-hook"
       j_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")

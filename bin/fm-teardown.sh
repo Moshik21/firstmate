@@ -1901,6 +1901,11 @@ retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 rm -f "$STATE/$ID.status" "$STATE/$ID.turn-ended" "$STATE/$ID.meta" \
   "$STATE/$ID.pi-ext.ts" "$STATE/$ID.grok-turnend-token" \
   "$STATE/$ID.kimi-turnend-token"
+# A historical launch could write Claude task wiring into this primary home's
+# local settings. Sweep after removing this task's meta so the finished task is
+# eligible too, while retaining the primary's own Claude guards.
+"$SCRIPT_DIR/fm-claude-task-hook-cleanup.sh" cleanup || \
+  echo "warning: could not clean stale Claude task hooks from the primary settings" >&2
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ]; then
   "$FM_ROOT/bin/fm-fleet-sync.sh" "$PROJ" || true
 fi
