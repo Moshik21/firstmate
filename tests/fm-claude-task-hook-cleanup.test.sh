@@ -130,6 +130,23 @@ test_retains_unrecognized_hook_entries() {
   pass "fm-claude-task-hook-cleanup: retains unrecognized hook entries"
 }
 
+test_retains_hooks_scoped_to_another_homes_state_dir() {
+  local home settings before
+  home=$(make_home "$TMP_ROOT/foreign-state")
+  settings="$home/.claude/settings.local.json"
+  # This hook belongs to a different home, so this home's *.meta list says
+  # nothing about whether its task is still live. Judging it by the wrong
+  # state dir would delete a live crewmate's wiring.
+  firstmate_hook_json "$TMP_ROOT/other-home/state" other-task > "$settings"
+  before=$(cksum "$settings")
+
+  run_cleanup "$home" >/dev/null
+
+  [ "$(cksum "$settings")" = "$before" ] \
+    || fail "cleanup swept a hook scoped to another home's state dir"
+  pass "fm-claude-task-hook-cleanup: retains hooks scoped to another home's state dir"
+}
+
 test_removes_legacy_turnended_hook_through_symlinked_home() {
   local real link settings
   real="$TMP_ROOT/legacy-real"
@@ -152,4 +169,5 @@ test_refuses_malformed_settings_without_rewriting
 test_accepts_settings_without_hooks_key
 test_leaves_settings_byte_identical_when_nothing_is_stale
 test_retains_unrecognized_hook_entries
+test_retains_hooks_scoped_to_another_homes_state_dir
 test_removes_legacy_turnended_hook_through_symlinked_home

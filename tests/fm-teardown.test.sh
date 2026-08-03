@@ -489,8 +489,18 @@ SH
 }
 
 # Run teardown with PATH mocking. Args: case_dir [extra args...]
+#
+# FM_HOME must name a sandbox dir, not fall back to FM_ROOT_OVERRIDE: teardown
+# sweeps stale Claude task hooks out of "$FM_HOME/.claude/settings.local.json"
+# (bin/fm-claude-task-hook-cleanup.sh). Without this, every case would point that
+# sweep at the developer's real checkout while judging liveness from the sandbox
+# state dir, silently pruning hooks for their in-flight tasks. It is a sibling of
+# the case dir rather than the case dir itself so the secondmate cases' homes do
+# not land inside the active firstmate home.
 run_teardown() {
   local case_dir=$1; shift
+  mkdir -p "$case_dir/fm-home"
+  FM_HOME="$case_dir/fm-home" \
   FM_ROOT_OVERRIDE="$ROOT" \
   FM_STATE_OVERRIDE="$case_dir/state" \
   FM_CONFIG_OVERRIDE="$case_dir/config" \

@@ -151,7 +151,13 @@ pass "real herdr: the auto-detected spawn's launch command actually ran in the h
 # --- teardown completes the trivial spawn/teardown cycle --------------------
 
 TEARDOWN_OUT="$TMP_ROOT/teardown.out"
-FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+# FM_HOME must be scratch, not the FM_ROOT_OVERRIDE fallback: teardown sweeps
+# stale Claude task hooks out of "$FM_HOME/.claude/settings.local.json"
+# (bin/fm-claude-task-hook-cleanup.sh), so the default would point that sweep at
+# the developer's real checkout while judging liveness from $STATE.
+mkdir -p "$TMP_ROOT/fm-home"
+FM_HOME="$TMP_ROOT/fm-home" \
+  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
   FM_CONFIG_OVERRIDE="$CONFIG" \
   "$ROOT/bin/fm-teardown.sh" "$ID" >"$TEARDOWN_OUT" 2>&1
 status=$?

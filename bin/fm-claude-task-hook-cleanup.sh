@@ -62,6 +62,11 @@ jq --argjson states "$STATE_PATHS" --argjson active "$ACTIVE_IDS" '
     if $busy_id != "" then $busy_id
     else match_task_id("(?<id>[A-Za-z0-9][A-Za-z0-9_.-]*)\\.turn-ended")
     end;
+  # The state dir a busy hook itself names, so the liveness verdict below is
+  # only applied to hooks scoped to the very state dir $active was read from.
+  def busy_state:
+    ([match("fm-busy-event\\.sh[^\\n]* apply '\''(?<st>[^'\'']*)'\''")? |
+      .captures[] | select(.name == "st").string] | first // "");
   def stale_firstmate_task_hook:
     if type != "object" then false
     elif (.command | type) != "string" then false
@@ -70,7 +75,8 @@ jq --argjson states "$STATE_PATHS" --argjson active "$ACTIVE_IDS" '
       ($cmd | task_id) as $id |
       $id != "" and
       ($active | index($id) == null) and
-      (($cmd | contains("fm-busy-event.sh")) or
+      ((($cmd | contains("fm-busy-event.sh")) and
+        ($states | index($cmd | busy_state) != null)) or
        ($states | any(. as $s | $cmd | contains($s + "/" + $id + ".turn-ended"))))
     end;
   def sweep_matcher:
