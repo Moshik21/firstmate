@@ -40,6 +40,10 @@ command -v jq >/dev/null 2>&1 || {
 }
 
 STATE_REAL=$(cd "$STATE" && pwd -P)
+# Legacy hooks embedded the logical "$FM_ROOT/state/<id>.turn-ended"; the
+# current wiring embeds the resolved path. Accept either spelling so a home
+# reached through a symlinked path component still matches.
+STATE_PATHS=$(printf '%s\n' "$STATE_REAL" "$STATE" | jq -Rsc 'split("\n") | map(select(length > 0)) | unique')
 ACTIVE_IDS=$(for meta in "$STATE"/*.meta; do
   [ -f "$meta" ] && [ ! -L "$meta" ] || continue
   basename "${meta%.meta}"
@@ -50,7 +54,7 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-jq --arg state "$STATE_REAL" --argjson active "$ACTIVE_IDS" '
+jq --argjson states "$STATE_PATHS" --argjson active "$ACTIVE_IDS" '
   def match_task_id($pattern):
     ([match($pattern)? | .captures[] | select(.name == "id").string] | first // "");
   def task_id:
@@ -59,31 +63,36 @@ jq --arg state "$STATE_REAL" --argjson active "$ACTIVE_IDS" '
     else match_task_id("(?<id>[A-Za-z0-9][A-Za-z0-9_.-]*)\\.turn-ended")
     end;
   def stale_firstmate_task_hook:
-    . as $hook |
-    if ($hook.command? | type) != "string" then false
+    if type != "object" then false
+    elif (.command | type) != "string" then false
     else
-      ($hook.command | task_id) as $id |
+      .command as $cmd |
+      ($cmd | task_id) as $id |
       $id != "" and
       ($active | index($id) == null) and
-      (($hook.command | contains("fm-busy-event.sh")) or
-       ($hook.command | contains($state + "/" + $id + ".turn-ended")))
+      (($cmd | contains("fm-busy-event.sh")) or
+       ($states | any(. as $s | $cmd | contains($s + "/" + $id + ".turn-ended"))))
     end;
-  .hooks |= with_entries(
-    .value |= (
-      map(
-        if (.hooks? | type) == "array" then
-          .hooks |= map(select(stale_firstmate_task_hook | not)) |
-          select(.hooks | length > 0)
-        else . end
-      ) | map(select(. != null))
-    )
-  )
+  def sweep_matcher:
+    if type == "object" and ((.hooks? | type) == "array") then
+      (.hooks | map(select(stale_firstmate_task_hook | not))) as $kept |
+      if ($kept | length) == 0 and ((.hooks | length) > 0) then empty
+      else .hooks = $kept
+      end
+    else . end;
+  . as $orig |
+  (if type == "object" and ((.hooks | type) == "object") then
+     .hooks |= with_entries(
+       .value |= (if type == "array" then map(sweep_matcher) else . end)
+     )
+   else . end) as $swept |
+  if $swept == $orig then empty else $swept end
 ' "$SETTINGS" > "$TMP" || {
   echo "error: Claude local settings are not valid hook JSON: $SETTINGS" >&2
   exit 1
 }
 
-if cmp -s "$SETTINGS" "$TMP"; then
+if [ ! -s "$TMP" ]; then
   exit 0
 fi
 chmod --reference="$SETTINGS" "$TMP" 2>/dev/null || chmod 600 "$TMP"

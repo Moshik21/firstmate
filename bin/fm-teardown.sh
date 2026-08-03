@@ -112,6 +112,8 @@ SUB_HOME_MARKER=".fm-secondmate-home"
 . "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-primary-scope-lib.sh
+. "$SCRIPT_DIR/fm-primary-scope-lib.sh"
 if [ "$#" -lt 1 ] || ! fm_task_id_path_safe "$1"; then
   echo "error: invalid teardown request" >&2
   exit 2
@@ -1051,6 +1053,30 @@ firstmate_home_has_treehouse_slot() {
   worktree_registered_for_project "$FM_ROOT" "$home"
 }
 
+# .claude/settings.local.json is the only per-task harness artifact a human also
+# owns: in a disposable task worktree the whole file is ours to erase, but a
+# historical launch could have recorded a firstmate home as worktree=, where the
+# same path holds the home's own Claude guards. Refuse the whole-file removal
+# for any firstmate home (this process's own, the firstmate repo, or any other
+# genuine home checkout) and leave those to fm-claude-task-hook-cleanup.sh,
+# which removes only the stale Firstmate task entries.
+remove_task_claude_settings() {  # <worktree>
+  local wt=$1 wt_real abs_home abs_root
+  wt_real=$(CDPATH='' cd -- "$wt" 2>/dev/null && pwd -P) || return 0
+  abs_home=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || abs_home=
+  abs_root=$(CDPATH='' cd -- "$FM_ROOT" 2>/dev/null && pwd -P) || abs_root=
+  if [ -n "$abs_home" ] && [ "$wt_real" = "$abs_home" ]; then
+    return 0
+  fi
+  if [ -n "$abs_root" ] && [ "$wt_real" = "$abs_root" ]; then
+    return 0
+  fi
+  if fm_primary_scope_matches "$wt_real" "$wt_real/state"; then
+    return 0
+  fi
+  rm -f "$wt/.claude/settings.local.json"
+}
+
 validate_removal_target() {
   local target=$1 label=$2 abs_target abs_home abs_root
   [ -n "$target" ] || return 0
@@ -1616,13 +1642,15 @@ cleanup_firstmate_home_children() {
     elif [ "$child_backend" = orca ]; then
       if [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
-        rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
+        remove_task_claude_settings "$child_wt"
+        rm -f "$child_wt/.opencode/plugins/fm-turn-end.js" \
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
       fi
       fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
       validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
-      rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
+      remove_task_claude_settings "$child_wt"
+      rm -f "$child_wt/.opencode/plugins/fm-turn-end.js" \
         "$child_wt/.opencode/plugins/fm-busy-state.js" \
         "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
       if [ -n "$child_proj" ] && [ -d "$child_proj" ] && command -v treehouse >/dev/null 2>&1; then
@@ -1789,7 +1817,8 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
         git -C "$WT" branch -D "$branch" >/dev/null 2>&1 || true
       fi
     fi
-    rm -f "$WT/.claude/settings.local.json" "$WT/.opencode/plugins/fm-turn-end.js" \
+    remove_task_claude_settings "$WT"
+    rm -f "$WT/.opencode/plugins/fm-turn-end.js" \
       "$WT/.opencode/plugins/fm-busy-state.js" \
       "$WT/.fm-grok-turnend" "$WT/.fm-kimi-turnend"
   fi
@@ -1803,7 +1832,8 @@ elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
     fi
   fi
   # Remove our hook file so a reused pool worktree cannot fire signals for a dead task.
-  rm -f "$WT/.claude/settings.local.json" "$WT/.opencode/plugins/fm-turn-end.js" \
+  remove_task_claude_settings "$WT"
+  rm -f "$WT/.opencode/plugins/fm-turn-end.js" \
     "$WT/.fm-grok-turnend" "$WT/.fm-kimi-turnend"
   # Kills remaining processes in the worktree (including the agent), resets, returns
   # to pool. treehouse resolves the pool from the working directory, so run it from

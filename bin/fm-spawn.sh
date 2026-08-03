@@ -211,6 +211,8 @@ SUB_HOME_MARKER=".fm-secondmate-home"
 . "$SCRIPT_DIR/fm-trace-context-lib.sh"
 # shellcheck source=bin/fm-remote-readiness-lib.sh
 . "$SCRIPT_DIR/fm-remote-readiness-lib.sh"
+# shellcheck source=bin/fm-primary-scope-lib.sh
+. "$SCRIPT_DIR/fm-primary-scope-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
@@ -1296,6 +1298,15 @@ validate_claude_task_hook_install_location() {  # Refuse primary or redirected s
     echo "error: refusing to install Claude task hooks in the primary home '$FM_HOME'" >&2
     exit 1
   fi
+  # $WT is settled from the pane's reported path, which can transiently name a
+  # different real checkout (see the treehouse-get wait below). A firstmate home
+  # other than this process's own - the main checkout, or a marked secondmate
+  # home - would pass the equality test above, so refuse any genuine firstmate
+  # home checkout, not only our own.
+  if fm_primary_scope_matches "$wt_real" "$wt_real/state"; then
+    echo "error: refusing to install Claude task hooks in the firstmate home '$WT'" >&2
+    exit 1
+  fi
   hook_dir="$WT/.claude"
   mkdir -p "$hook_dir"
   hook_dir_real=$(cd "$hook_dir" 2>/dev/null && pwd -P) || {
@@ -1790,6 +1801,12 @@ exclude_path() {
   grep -qxF "$rel" "$EXCL" 2>/dev/null || echo "$rel" >> "$EXCL"
 }
 if [ "$KIND" != secondmate ]; then
+  # Refuse an unsafe Claude hook install location BEFORE the busy contract is
+  # armed below: a refusal after the arm would leave an armed busy record and a
+  # live window with no state/<id>.meta, which no teardown could reach.
+  case "$HARNESS" in
+    claude*) validate_claude_task_hook_install_location ;;
+  esac
   # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
   # adapter with a verified semantic source. The launch brief sent below IS a
   # submitted turn, so the seed record is busy/fm-spawn. The minted gen is
@@ -1835,7 +1852,6 @@ if [ "$KIND" != secondmate ]; then
       # turn-ended NOTIFICATION touch for the watcher. Every hook command
       # tolerates a refused event (|| true) so a stale-gen writer can never
       # break Claude's own lifecycle.
-      validate_claude_task_hook_install_location
       busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
       busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source claude-hook"
       j_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")

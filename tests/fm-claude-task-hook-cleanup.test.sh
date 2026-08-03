@@ -82,6 +82,74 @@ test_refuses_malformed_settings_without_rewriting() {
   pass "fm-claude-task-hook-cleanup: refuses malformed settings without rewriting"
 }
 
+test_accepts_settings_without_hooks_key() {
+  local home settings before status
+  home=$(make_home "$TMP_ROOT/hookless")
+  settings="$home/.claude/settings.local.json"
+  printf '{"permissions":{"allow":["Bash(ls:*)"]}}' > "$settings"
+  before=$(cksum "$settings")
+  set +e
+  run_cleanup "$home" >/dev/null 2>&1
+  status=$?
+  set -e
+  [ "$status" -eq 0 ] || fail "cleanup must accept settings without a hooks key"
+  [ "$(cksum "$settings")" = "$before" ] || fail "cleanup rewrote hook-free settings"
+  pass "fm-claude-task-hook-cleanup: accepts settings without a hooks key"
+}
+
+test_leaves_settings_byte_identical_when_nothing_is_stale() {
+  local home settings before
+  home=$(make_home "$TMP_ROOT/nostale")
+  settings="$home/.claude/settings.local.json"
+  : > "$home/state/live-task.meta"
+  firstmate_hook_json "$home/state" live-task > "$settings"
+  before=$(cksum "$settings")
+
+  run_cleanup "$home" >/dev/null
+
+  [ "$(cksum "$settings")" = "$before" ] \
+    || fail "cleanup rewrote settings that hold no stale hooks"
+  pass "fm-claude-task-hook-cleanup: leaves settings untouched when nothing is stale"
+}
+
+test_retains_unrecognized_hook_entries() {
+  local home settings
+  home=$(make_home "$TMP_ROOT/unrecognized")
+  settings="$home/.claude/settings.local.json"
+  jq -cn --arg state "$home/state" '{hooks: {
+    Stop: [{hooks: ["weird", {type: "command"}, {type: "command", command: ("touch '\''" + $state + "/gone.turn-ended'\''")}]}],
+    SessionStart: "not-an-array"
+  }}' > "$settings"
+
+  run_cleanup "$home" >/dev/null
+
+  jq -e '(.hooks.Stop[0].hooks | length == 2) and (.hooks.Stop[0].hooks[0] == "weird") and (.hooks.Stop[0].hooks[1] == {type: "command"})' "$settings" >/dev/null \
+    || fail "cleanup must retain hook entries it does not recognize"
+  jq -e '.hooks.SessionStart == "not-an-array"' "$settings" >/dev/null \
+    || fail "cleanup must retain non-array hook event values"
+  pass "fm-claude-task-hook-cleanup: retains unrecognized hook entries"
+}
+
+test_removes_legacy_turnended_hook_through_symlinked_home() {
+  local real link settings
+  real="$TMP_ROOT/legacy-real"
+  link="$TMP_ROOT/legacy-link"
+  make_home "$real" >/dev/null
+  ln -s "$real" "$link"
+  settings="$real/.claude/settings.local.json"
+  jq -cn --arg state "$link/state" '{hooks: {Stop: [{hooks: [{type: "command", command: ("touch '\''" + $state + "/gone.turn-ended'\''")}]}]}}' > "$settings"
+
+  run_cleanup "$link" >/dev/null
+
+  jq -e '.hooks.Stop == []' "$settings" >/dev/null \
+    || fail "cleanup must remove a legacy stale hook recorded through the logical home path"
+  pass "fm-claude-task-hook-cleanup: removes legacy stale hook via logical home path"
+}
+
 test_removes_only_nonexistent_task_hooks
 test_removes_legacy_turnended_only_hook
 test_refuses_malformed_settings_without_rewriting
+test_accepts_settings_without_hooks_key
+test_leaves_settings_byte_identical_when_nothing_is_stale
+test_retains_unrecognized_hook_entries
+test_removes_legacy_turnended_hook_through_symlinked_home
