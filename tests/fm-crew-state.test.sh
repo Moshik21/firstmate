@@ -27,7 +27,10 @@
 #       benefits from the fix in both directions.
 #   (l) committed no-mistakes implementation awaiting firstmate's validation
 #       trigger is distinct from done, without affecting other modes, scouts,
-#       tasks with an attributable run, or tasks with a recorded PR.
+#       tasks with an attributable run, tasks with a PR recorded in meta or in
+#       their own status stream, busy workers, dead workers, or an unavailable
+#       validation-state lookup - while a determinate no-run answer that exits
+#       non-zero still counts as an answer.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -59,12 +62,21 @@ make_repo_on_branch() {  # <dir> <branch>
 # the real CLI), and the actual top-level run-listing command, `no-mistakes
 # runs --limit N`, which is plain text - no run id, no quoting - serving
 # FM_FAKE_RUNS_LIST verbatim.
+#
+# Two knobs drive the helper's determinate-vs-unavailable classification, which
+# the real CLI does not express through its exit code alone:
+#   FM_FAKE_NM_RC=<n>        exit code for an answer that still reached stdout
+#                            (the real `axi status` prints `No active run.` /
+#                            `error: repo not initialized` and exits non-zero)
+#   FM_FAKE_NM_UNAVAILABLE=1 the lookup never lands: nothing on stdout, non-zero
+#                            exit (a crashed CLI, or 124 for a timeout kill)
 make_fakebin() {  # <dir> -> echoes fakebin path
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
   cat > "$fb/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 set -u
+[ "${FM_FAKE_NM_UNAVAILABLE:-0}" = 1 ] && exit "${FM_FAKE_NM_RC:-124}"
 case "${1:-}" in
   axi)
     shift
@@ -80,7 +92,7 @@ case "${1:-}" in
   runs)
     printf '%s\n' "${FM_FAKE_RUNS_LIST:-}" ;;
 esac
-exit 0
+exit "${FM_FAKE_NM_RC:-0}"
 SH
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -173,8 +185,11 @@ reset_fakes() {
   FM_FAKE_HERDR_MISSING=0
   FM_FAKE_HERDR_AGENT_STATUS=""
   FM_FAKE_CI_LOGS=""
+  FM_FAKE_NM_RC=0
+  FM_FAKE_NM_UNAVAILABLE=0
   export FM_FAKE_AXI_STATUS FM_FAKE_AXI_STATUS_RUN FM_FAKE_RUNS_LIST FM_FAKE_BUSY FM_FAKE_BUSY_TEXT FM_FAKE_TMUX_MISSING
   export FM_FAKE_HERDR_BUSY FM_FAKE_HERDR_MISSING FM_FAKE_HERDR_AGENT_STATUS FM_FAKE_CI_LOGS
+  export FM_FAKE_NM_RC FM_FAKE_NM_UNAVAILABLE
 }
 
 # --- run-object fixtures (TOON, as `no-mistakes axi status` emits) -----------
@@ -889,6 +904,123 @@ test_recorded_pr_does_not_await_validation_trigger() {
   pass "a recorded PR suppresses the pending validation-trigger state"
 }
 
+# meta pr= is written only by the explicit bin/fm-pr-check.sh firstmate action, so
+# a ship that already shipped carries its PR only in its own status stream until
+# then. That stream PR closes the handoff exactly like meta pr= does - otherwise
+# an already-shipped task whose run aged out of the runs window (or whose head
+# moved past it) would be re-reported as needing a validation trigger.
+test_status_log_pr_does_not_await_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case status-log-pr-no-trigger)
+  make_repo_on_branch "$d/wt" fm/status-log-pr-no-trigger
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/status-log-pr-no-trigger.meta" \
+    "window=fm:fm-status-log-pr-no-trigger" "worktree=$d/wt" "kind=ship" \
+    "mode=no-mistakes" "harness=claude"
+  printf 'done: PR https://github.com/o/r/pull/9 checks green\n' \
+    > "$d/state/status-log-pr-no-trigger.status"
+  # The run that produced that PR is no longer attributable (aged out of the
+  # bounded runs window), which is precisely the misclassification risk.
+  FM_FAKE_AXI_STATUS=""
+  FM_FAKE_RUNS_LIST=""
+  arm_idle_record "$d/state" status-log-pr-no-trigger
+  local out; out=$(run_crew_state "$d" status-log-pr-no-trigger)
+  assert_contains "$out" "state: done" "a PR recorded in the status stream keeps the task done"
+  assert_not_contains "$out" "awaiting-validation-trigger" "a shipped PR closes the pre-validation handoff"
+  pass "a PR recorded only in the status stream suppresses the pending-trigger state"
+}
+
+# The flagship case reaches the CLI as a determinate answer that still exits
+# non-zero (verified against the real CLI: `axi status` answers `No active run.`
+# / `error: repo not initialized` on stdout with rc=1). An answer that landed is
+# an answer, so this must not be read as an unavailable lookup.
+test_determinate_no_run_answer_with_nonzero_exit_awaits_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case determinate-no-run)
+  make_repo_on_branch "$d/wt" fm/determinate-no-run
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/determinate-no-run.meta" \
+    "window=fm:fm-determinate-no-run" "worktree=$d/wt" "kind=ship" \
+    "mode=no-mistakes" "harness=claude"
+  printf 'done: implementation committed on the task branch\n' > "$d/state/determinate-no-run.status"
+  FM_FAKE_AXI_STATUS="No active run. Push through the gate to start a pipeline:"
+  FM_FAKE_RUNS_LIST="0 runs yet in this repository"
+  FM_FAKE_NM_RC=1
+  arm_idle_record "$d/state" determinate-no-run
+  local out; out=$(run_crew_state "$d" determinate-no-run)
+  assert_contains "$out" "state: awaiting-validation-trigger" \
+    "a determinate no-run answer must still expose firstmate's pending trigger"
+  assert_not_contains "$out" "state: done" "a never-validated implementation is not lifecycle-complete"
+  pass "a determinate no-run answer that exits non-zero still exposes the pending trigger"
+}
+
+# An unavailable lookup (timed-out or crashed CLI: nothing on stdout) proves
+# nothing about whether a run exists, so it must never manufacture the handoff.
+test_unavailable_validation_lookup_does_not_await_validation_trigger() {
+  local rc d id out
+  # 124 is the timeout kill; 1 with no output is a crashed CLI.
+  for rc in 124 1; do
+    reset_fakes
+    id="nm-unavailable-rc$rc"
+    d=$(new_case "$id")
+    make_repo_on_branch "$d/wt" "fm/$id"
+    make_fakebin "$d" >/dev/null
+    fm_write_meta "$d/state/$id.meta" "window=fm:fm-$id" "worktree=$d/wt" \
+      "kind=ship" "mode=no-mistakes" "harness=claude"
+    printf 'done: implementation committed on the task branch\n' > "$d/state/$id.status"
+    FM_FAKE_NM_UNAVAILABLE=1
+    FM_FAKE_NM_RC=$rc
+    arm_idle_record "$d/state" "$id"
+    out=$(run_crew_state "$d" "$id")
+    assert_not_contains "$out" "awaiting-validation-trigger" \
+      "an unavailable validation-state lookup (rc=$rc) must not assert a pending trigger"
+    assert_contains "$out" "state: done" "an unavailable lookup falls back to the status-log verb"
+  done
+  pass "an unavailable validation-state lookup never manufactures a pending trigger"
+}
+
+# A busy worker is still implementing (its `done:` event is a stale earlier
+# event); the live busy verdict outranks the log, exactly as for every other mode.
+test_busy_worker_does_not_await_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case busy-no-trigger)
+  make_repo_on_branch "$d/wt" fm/busy-no-trigger
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/busy-no-trigger.meta" "window=fm:fm-busy-no-trigger" \
+    "worktree=$d/wt" "kind=ship" "mode=no-mistakes" "harness=claude"
+  printf 'done: implementation committed on the task branch\n' > "$d/state/busy-no-trigger.status"
+  FM_FAKE_AXI_STATUS=""
+  FM_FAKE_RUNS_LIST=""
+  FM_FAKE_BUSY=1
+  local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" busy-no-trigger)
+  "$ROOT/bin/fm-busy-event.sh" apply "$d/state" busy-no-trigger busy --gen "$gen" \
+    --source claude-hook --event user-prompt-submit
+  local out; out=$(run_crew_state "$d" busy-no-trigger)
+  assert_contains "$out" "state: working" "a busy worker is still implementing"
+  assert_not_contains "$out" "awaiting-validation-trigger" "a busy worker is not waiting on firstmate"
+  pass "a busy no-mistakes worker never reports a pending validation trigger"
+}
+
+# A dead worker cannot be asked to do anything, and its log is not a current
+# state: it stays unknown/none rather than acquiring a pending firstmate action.
+test_dead_worker_does_not_await_validation_trigger() {
+  reset_fakes
+  local d; d=$(new_case dead-no-trigger)
+  make_repo_on_branch "$d/wt" fm/dead-no-trigger
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/dead-no-trigger.meta" "window=fm:fm-dead-no-trigger" \
+    "worktree=$d/wt" "kind=ship" "mode=no-mistakes" "harness=claude"
+  printf 'done: implementation committed on the task branch\n' > "$d/state/dead-no-trigger.status"
+  FM_FAKE_AXI_STATUS=""
+  FM_FAKE_RUNS_LIST=""
+  FM_FAKE_TMUX_MISSING=1
+  local out; out=$(run_crew_state "$d" dead-no-trigger)
+  assert_contains "$out" "state: unknown" "a dead worker stays unknown"
+  assert_contains "$out" "source: none" "a dead worker has no current-state source"
+  assert_not_contains "$out" "awaiting-validation-trigger" "a dead worker must not acquire a pending trigger"
+  pass "a dead no-mistakes worker never reports a pending validation trigger"
+}
+
 # (f) no run for this crew + a busy pane -> working via pane
 test_no_run_busy_pane() {
   reset_fakes
@@ -1444,6 +1576,11 @@ test_non_pipeline_modes_done_do_not_await_validation_trigger
 test_scout_done_does_not_await_validation_trigger
 test_validation_run_does_not_await_validation_trigger
 test_recorded_pr_does_not_await_validation_trigger
+test_status_log_pr_does_not_await_validation_trigger
+test_determinate_no_run_answer_with_nonzero_exit_awaits_validation_trigger
+test_unavailable_validation_lookup_does_not_await_validation_trigger
+test_busy_worker_does_not_await_validation_trigger
+test_dead_worker_does_not_await_validation_trigger
 test_no_run_busy_pane
 test_no_run_footer_text_alone_is_not_working
 test_no_run_grok_uses_isolated_fallback

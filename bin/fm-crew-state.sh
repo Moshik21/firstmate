@@ -41,10 +41,11 @@
 #      agree, and are reported as parked.
 #   4. No run for this crew (pre-validation, or kind=scout): fall back to the
 #      recorded backend's pane busy state. An idle no-mistakes ship whose last
-#      event is implementation `done:` and whose metadata has no PR is awaiting
-#      firstmate's validation trigger, not done. Other idle tasks fall back to the
-#      status log's last line only when its verb maps to a recognized run-state.
-#      Decision-only events such as `resolved` never become current state or detail.
+#      event is implementation `done:` and which has no PR recorded in either its
+#      metadata or its own status stream is awaiting firstmate's validation
+#      trigger, not done. Other idle tasks fall back to the status log's last
+#      line only when its verb maps to a recognized run-state. Decision-only
+#      events such as `resolved` never become current state or detail.
 #   5. Missing meta or torn-down worktree: report unknown · none. If no run is
 #      attributed to this crew, a dead endpoint also reports unknown · none rather
 #      than trusting a stale status log.
@@ -140,6 +141,17 @@ map_log_state() {  # <line>
 LOG_LINE=$(log_last_line || true)
 LOG_VERB=$(status_line_verb "$LOG_LINE")
 
+# A recorded PR proves the task advanced past the pre-validation handoff. Meta
+# `pr=` alone is not that proof: it is written only by the explicit
+# bin/fm-pr-check.sh firstmate action, so a ship that already shipped carries its
+# PR only in its own status stream (`done: PR <url> checks green`) until firstmate
+# records it. Read the stream with the same pattern the fleet snapshot uses
+# (bin/fm-fleet-snapshot.sh first_pr_url_in_file) so both surfaces agree on what
+# counts as a recorded PR.
+if [ -z "$PR" ] && [ -f "$LOG" ]; then
+  PR=$(grep -Eo 'https?://[^[:space:])"]+/pull/[0-9]+' "$LOG" 2>/dev/null | head -1 || true)
+fi
+
 # pane_readable is consulted ONLY in the no-run fallback below. The run-step path
 # stays authoritative regardless of pane liveness - judge by the run-step, not the
 # shell - so a finished crew whose endpoint has closed still reports its run-step
@@ -188,20 +200,37 @@ strip_quotes() {
 }
 
 # Bounded no-mistakes call in the worktree. Stdout is the data channel and the
-# return code distinguishes a completed empty answer from a timeout or CLI error,
-# so absence of a run is never inferred from an unavailable lookup.
+# return code separates a DETERMINATE CLI answer (0) from an UNAVAILABLE lookup
+# (1), so absence of a run is never inferred from a lookup that never landed.
+#
+# The CLI's own exit code cannot carry that distinction: it answers determinate
+# no-run questions on stdout while exiting non-zero - verified against the
+# installed CLI, `axi status` prints `error: repo not initialized ...` with rc=1,
+# and it carries the sibling determinate answers `No active run. Push through the
+# gate to start a pipeline:` and `0 runs yet in this repository`. Treating a
+# non-zero rc as unavailable would therefore suppress the pending-trigger verdict
+# for exactly the flagship case (a branch whose validation has never been
+# started). So the classification is by evidence, not by rc: a timeout (124), no
+# way to bound the call at all, or a non-zero exit that produced no output
+# whatsoever is unavailable; anything that put an answer on stdout is
+# determinate and gets parsed.
 HAVE_TIMEOUT=none
 if command -v timeout >/dev/null 2>&1; then HAVE_TIMEOUT=timeout
 elif command -v gtimeout >/dev/null 2>&1; then HAVE_TIMEOUT=gtimeout
 elif command -v perl >/dev/null 2>&1; then HAVE_TIMEOUT=perl
 fi
-nm_run() {  # <args...>
+nm_run() {  # <args...> -> 0 determinate answer on stdout, 1 lookup unavailable
+  local out rc
   case "$HAVE_TIMEOUT" in
-    timeout)  ( cd "$WT" && timeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ;;
-    gtimeout) ( cd "$WT" && gtimeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ;;
-    perl)     ( cd "$WT" && perl -e 'my $t = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0); exec @ARGV } local $SIG{ALRM} = sub { kill "TERM", -$pid; select undef, undef, undef, 0.2; kill "KILL", -$pid; exit 124 }; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ;;
+    timeout)  out=$( ( cd "$WT" && timeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ); rc=$? ;;
+    gtimeout) out=$( ( cd "$WT" && gtimeout "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ); rc=$? ;;
+    perl)     out=$( ( cd "$WT" && perl -e 'my $t = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0); exec @ARGV } local $SIG{ALRM} = sub { kill "TERM", -$pid; select undef, undef, undef, 0.2; kill "KILL", -$pid; exit 124 }; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$NM_TIMEOUT" no-mistakes "$@" ) 2>/dev/null ); rc=$? ;;
     *)        return 1 ;;
   esac
+  [ -n "$out" ] && printf '%s\n' "$out"
+  [ "$rc" = 124 ] && return 1
+  [ "$rc" != 0 ] && [ -z "$out" ] && return 1
+  return 0
 }
 
 # Scalar value of a TOON key in the captured run output ($RUN_OUT).
@@ -449,8 +478,10 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
       RUN_LOOKUP_COMPLETE=1
     else
       # The active-or-most-recent run is for another branch, absent, or bound to
-      # a rewritten/diverged head. The completed primary read permits one bounded
-      # coarse lookup to distinguish no matching run from a lookup failure.
+      # a rewritten/diverged head. The primary call landed a determinate answer,
+      # so one more bounded coarse lookup is affordable and can distinguish no
+      # matching run from a lookup that never landed. (An unavailable primary
+      # call skips this: retrying immediately would just double the wait.)
       if COARSE_STATUS=$(nm_runs_status_for_branch "$CREW_BRANCH"); then
         HAVE_RUN=1
         RUN_SOURCE=coarse
@@ -608,8 +639,9 @@ fi
 # worker. Reaching this point proves no active or terminal run is attributable to
 # the current code, and the idle verdict above proves the healthy worker is
 # correctly waiting rather than still implementing. Keep this distinct from done
-# until either a run accounts for the code or PR metadata is recorded. Other
-# delivery modes and kinds intentionally finish without this handoff.
+# until either a run accounts for the code or a PR is recorded (meta or status
+# stream). Other delivery modes and kinds intentionally finish without this
+# handoff.
 if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ] && [ -z "$PR" ] \
   && [ "$LOG_VERB" = "done" ] && [ "$RUN_LOOKUP_COMPLETE" = 1 ]; then
   emit awaiting-validation-trigger status-log "implementation committed; firstmate must trigger no-mistakes validation"
