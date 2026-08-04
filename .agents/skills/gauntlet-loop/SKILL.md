@@ -33,7 +33,7 @@ Default the loop off for pure plumbing whose complete contract is exercised by g
 Do not add the loop merely to make routine infrastructure work sound more rigorous.
 When applicability is uncertain, identify whether a reasonable critic could inspect a real artifact against a stronger bar than the existing executable contract.
 Use the loop only when the answer is yes.
-Load the loop only when the captain invokes a gauntlet or when the accepted task is already owner-facing, design-craft, or claim-making at intake, never as a discretionary extra review layered onto other work.
+Load the loop only when the captain invokes a gauntlet, when the accepted task is already owner-facing, design-craft, or claim-making at intake, or when its proof depends on the real target box rather than a proxy environment, never as a discretionary extra review layered onto other work.
 The lead duty belongs to whoever owns the accepted task, normally firstmate for a directly owned task or the crewmate lead of its worktree, the builder duty belongs to that task's existing worker, and the critic duty belongs to a fresh separate spawn, so the loop uses only the existing captain, firstmate, crewmate, and secondmate roles and invents no new fleet role.
 
 ## Frame the gauntlet
@@ -104,9 +104,9 @@ The gauntlet passes only when the relevant piece-level bars and the required who
 ## Compose with delivery and no-mistakes
 
 Run the gauntlet inside the accepted task and selected delivery path.
-The gauntlet is an in-task quality loop on inspectable owner-facing craft and claims, so it is not a second pull-request review and not one of the stacked serial manual clean-verdict gates that section 8 forbids.
+The gauntlet is an in-task quality loop on inspectable owner-facing craft and claims, so it is not a second pull-request review and not one of the stacked serial manual clean-verdict gates that `AGENTS.md` section 7's selected delivery path and approval authority forbids.
 It never authorizes holding a pull request, a merge, or any delivery step open for extra manual review, and it never converts its own verdict into delivery approval.
-The captain keeps merge authority, and standing `yolo` authority changes that only where section 8 already allows it.
+The captain keeps merge authority, and standing `yolo` authority changes that only where `AGENTS.md` section 7's selected delivery path and approval authority already allows it.
 The gauntlet adds a quality critic loop for inspectable output, but it does not replace executable tests, CI, code review, documentation checks, or no-mistakes.
 Complete builder changes and the gauntlet verdict before starting no-mistakes validation so the quality loop does not compete with pipeline ownership of the branch.
 Do not run the critic as a parallel code reviewer while no-mistakes owns validation.
