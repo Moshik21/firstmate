@@ -33,6 +33,8 @@ Default the loop off for pure plumbing whose complete contract is exercised by g
 Do not add the loop merely to make routine infrastructure work sound more rigorous.
 When applicability is uncertain, identify whether a reasonable critic could inspect a real artifact against a stronger bar than the existing executable contract.
 Use the loop only when the answer is yes.
+Load the loop only when the captain invokes a gauntlet or when the accepted task is already owner-facing, design-craft, or claim-making at intake, never as a discretionary extra review layered onto other work.
+The lead duty belongs to whoever owns the accepted task, normally firstmate for a directly owned task or the crewmate lead of its worktree, the builder duty belongs to that task's existing worker, and the critic duty belongs to a fresh separate spawn, so the loop uses only the existing captain, firstmate, crewmate, and secondmate roles and invents no new fleet role.
 
 ## Frame the gauntlet
 
@@ -43,7 +45,7 @@ Replace vague standards such as "make it amazing" with observable comparisons or
 Record which references are authoritative, which are directional, and which claims require direct proof.
 Set a spend cap before the first build wave using the captain's cap when one exists or an explicit proportionate operational cap otherwise.
 Express the cap in a form that can actually stop work, such as token spend, monetary spend, or elapsed agent effort, without turning it into a planned fixed round count.
-The only loop exits are a pass against the bar, a captain stop, or the spend cap.
+The only loop exits are a pass against the bar, a captain stop, the spend cap, or rounds that no longer shrink the gap against the bar.
 
 ## Establish the live workbench
 
@@ -67,7 +69,10 @@ The builder owns how to close the gap and updates the real artifact plus workben
 
 Use a separate spawn with a fresh context for every critic judgment.
 Never let the builder continue in its own pane as the critic, and never let a self-review count as a gauntlet verdict.
-Treat the critic as a bounded knowledge-only scout attached to the accepted task, not as a second delivery owner or a replacement for the selected delivery path.
+Treat the critic as a bounded knowledge-only judgment inside the accepted task, not as a second delivery owner or a replacement for the selected delivery path.
+Default to a short-lived separate spawn or subagent that reads the real artifact and returns its verdict, rather than a full scout task with its own backlog entry, scratch worktree, and teardown.
+Record each verdict as a written artifact under the parent task, such as `data/<id>/critic-round-N.md` or a dated workbench section, so the judgment survives the spawn.
+Promote a round to a full scout task, with the usual dispatch-profile resolution, `bin/fm-brief.sh` scaffold, `harness-adapters` load, and `report.md`, only when the lead deliberately chooses that shape for a large independent piece.
 Give the critic the goal, fixed constraints, inspectable bar, relevant piece or whole-artifact scope, and direct access to the latest real artifact.
 Withhold the builder's rationale and implementation narrative unless either is itself part of the artifact being judged.
 Require inspection of the artifact rather than acceptance of screenshots, summaries, or claimed test results when the real surface is safely available.
@@ -83,9 +88,10 @@ Route the critic's single largest gap back to the builder as the next outcome to
 Preserve the goal, bar, and fixed constraints while leaving the implementation choice to the builder.
 After the builder updates the artifact and workbench, commission another fresh critic context against the new real artifact.
 Do not set a fixed number of rounds and do not stop because an arbitrary iteration count has elapsed.
-Continue until the current scope passes, the captain stops the loop, or the spend cap is reached.
-When the cap is reached without a pass, stop and report the strongest current artifact, the unmet bar criterion, the evidence for the largest remaining gap, and the consequence of shipping as-is.
-Do not relabel a capped result as a pass.
+Continue until the current scope passes, the captain stops the loop, the spend cap is reached, or successive rounds stop producing a materially smaller gap against the bar.
+Treat that diminishing return as a real stop condition rather than a reason to keep spawning critics indefinitely.
+When the loop stops without a pass, report the strongest current artifact, the unmet bar criterion, the evidence for the largest remaining gap, and the consequence of shipping as-is.
+Do not relabel a capped or stalled result as a pass.
 
 ## Reconcile the whole artifact
 
@@ -98,6 +104,9 @@ The gauntlet passes only when the relevant piece-level bars and the required who
 ## Compose with delivery and no-mistakes
 
 Run the gauntlet inside the accepted task and selected delivery path.
+The gauntlet is an in-task quality loop on inspectable owner-facing craft and claims, so it is not a second pull-request review and not one of the stacked serial manual clean-verdict gates that section 8 forbids.
+It never authorizes holding a pull request, a merge, or any delivery step open for extra manual review, and it never converts its own verdict into delivery approval.
+The captain keeps merge authority, and standing `yolo` authority changes that only where section 8 already allows it.
 The gauntlet adds a quality critic loop for inspectable output, but it does not replace executable tests, CI, code review, documentation checks, or no-mistakes.
 Complete builder changes and the gauntlet verdict before starting no-mistakes validation so the quality loop does not compete with pipeline ownership of the branch.
 Do not run the critic as a parallel code reviewer while no-mistakes owns validation.
