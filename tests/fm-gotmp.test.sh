@@ -73,6 +73,12 @@ make_fake_root() {
   ln -s "$ROOT/bin/fm-secondmate-registry-lib.sh" "$fake/bin/fm-secondmate-registry-lib.sh"
   # fm-wake-lib.sh: teardown sources it for serialized secondmate lifecycle locks.
   ln -s "$ROOT/bin/fm-wake-lib.sh" "$fake/bin/fm-wake-lib.sh"
+  # fm-primary-scope-lib.sh: teardown sources it to tell a disposable task
+  # worktree from a firstmate home before erasing .claude/settings.local.json.
+  # fm-claude-task-hook-cleanup.sh: teardown execs it to sweep stale Claude task
+  # hooks out of this home's settings (a no-op here - the fixture has none).
+  ln -s "$ROOT/bin/fm-primary-scope-lib.sh" "$fake/bin/fm-primary-scope-lib.sh"
+  ln -s "$ROOT/bin/fm-claude-task-hook-cleanup.sh" "$fake/bin/fm-claude-task-hook-cleanup.sh"
   # fm-guard.sh: stub (teardown calls it with `|| true`).
   cat > "$fake/bin/fm-guard.sh" <<'SH'
 #!/usr/bin/env bash
@@ -147,6 +153,8 @@ test_teardown_skips_gracefully_without_tasktmp() {
   ln -s "$ROOT/bin/fm-x-lib.sh" "$fake/bin/fm-x-lib.sh"
   ln -s "$ROOT/bin/fm-secondmate-registry-lib.sh" "$fake/bin/fm-secondmate-registry-lib.sh"
   ln -s "$ROOT/bin/fm-wake-lib.sh" "$fake/bin/fm-wake-lib.sh"
+  ln -s "$ROOT/bin/fm-primary-scope-lib.sh" "$fake/bin/fm-primary-scope-lib.sh"
+  ln -s "$ROOT/bin/fm-claude-task-hook-cleanup.sh" "$fake/bin/fm-claude-task-hook-cleanup.sh"
   cat > "$fake/bin/fm-guard.sh" <<'SH'
 #!/usr/bin/env bash
 exit 0
