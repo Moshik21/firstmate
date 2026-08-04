@@ -40,10 +40,12 @@
 #      is flagged superseded. A genuinely parked run plus a needs-decision log
 #      agree, and are reported as parked.
 #   4. No run for this crew (pre-validation, or kind=scout): fall back to the
-#      recorded backend's pane busy state. An idle no-mistakes ship whose last
-#      event is implementation `done:` and which has no PR recorded in either its
-#      metadata or its own status stream is awaiting firstmate's validation
-#      trigger, not done. Other idle tasks fall back to the status log's last
+#      recorded backend's pane busy state. An idle `mode=no-mistakes` ship whose
+#      last event is implementation `done:`, whose no-mistakes lookup landed a
+#      determinate answer proving no run is attributable, and which has no PR
+#      recorded in either its metadata or its own status stream is awaiting
+#      firstmate's validation trigger, not done. An unavailable lookup never
+#      reaches that verdict. Other idle tasks fall back to the status log's last
 #      line only when its verb maps to a recognized run-state. Decision-only
 #      events such as `resolved` never become current state or detail.
 #   5. Missing meta or torn-down worktree: report unknown · none. If no run is
