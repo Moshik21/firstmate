@@ -691,6 +691,17 @@ fi
 
 `bin/fm-watch.sh`'s `wedge_guard_evidence` and `wedge_defer_guard` own the exact invocation, deferral record, and fail-open boundaries.
 
+## Worker-declared wait deferral (config/wedge-defer-worker-wait)
+
+The optional local, gitignored `config/wedge-defer-worker-wait` presence flag opts this home into a default-off form of wait evidence in the watcher's wedge timer.
+With it present, a provably-working pane about to escalate is deferred to the `FM_PAUSE_RESURFACE_SECS` recheck cadence when its newest status line is the worker's own still-open `blocked:` or `needs-decision:` line, and the recheck names firstmate and that verb's clearing action instead of reporting a suspected wedge.
+Lines under supervisor-reserved keys do not count, the escalation count does not rise, and any newer status line or a newer acknowledged steering-inbox record ends the deferral, so an answered lane that never resumes returns to the ladder.
+The away-mode daemon honors the same evidence before it escalates a possible-wedge wake.
+
+With the flag absent the wedge timer spends no read for it and keeps the unchanged escalation schedule, reasons, and `demand-deep-inspection` wording.
+The flag is a home-local supervision-noise preference and is not inherited by secondmate homes.
+[`architecture.md`](architecture.md) owns the wait-evidence contract and `bin/fm-classify-lib.sh`'s `status_worker_wait_verb` owns which lines count.
+
 ## Gate defaults (.no-mistakes.yaml)
 
 The tracked [`.no-mistakes.yaml`](../.no-mistakes.yaml) sets `test.evidence.store_in_repo: true` and runs the canonical [shell/workflow lint](../bin/fm-lint.sh) followed by the [Pi production-consumer typecheck](../tests/fm-pi-primary-types.test.sh) in the compiler-owning lint phase.
