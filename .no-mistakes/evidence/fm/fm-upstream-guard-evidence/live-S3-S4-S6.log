@@ -1,0 +1,35 @@
+##### S3: deferral run survives a watcher restart (kill mid-run, cap=3)
+killed watcher; durable record: .guard-deferrals = 1
+restarted watcher rc=0
+[2026-10-09T14:59:15-0700] absorbed non-terminal stale (provably working): fm-lab-guardlive-1313-20541:w1:p1
+[2026-10-09T14:59:23-0700] absorbed non-terminal stale (guard ticket reports CRITICAL, deferral 1 of 3, idle 7s): fm-lab-guardlive-1313-20541:w1:p1
+total guard calls: 1 (expect 4 = 3 deferrals + the capped escalation, not 5+)
+
+##### S4: fail-open matrix (each: armed config, guard misbehaves -> plain 'escalation 1)' and no deferral record)
+timeout        rc=0 calls=1 defer-record=no | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 4s, possible wedge, escalation 1)
+nonzero        rc=0 calls=1 defer-record=no | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 5s, possible wedge, escalation 1)
+malformed      rc=0 calls=1 defer-record=no | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 4s, possible wedge, escalation 1)
+two-documents  rc=0 calls=1 defer-record=no | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 36s, possible wedge, escalation 1)
+empty-reason   rc=0 calls=1 defer-record=no | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 3s, possible wedge, escalation 1)
+unknown        rc=0 calls=1 defer-record=no | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 16s, possible wedge, escalation 1)
+warning        rc=0 calls=1 defer-record=no | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 7s, possible wedge, escalation 1)
+ok             rc=0 calls=1 defer-record=no | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 5s, possible wedge, escalation 1)
+-- untrusted config / guards
+group-writable-config rc=0 calls=0 | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 3s, possible wedge, escalation 1)
+[2026-10-09T15:07:22-0700] refused untrusted config/wedge-evidence-guards (must be a regular file owned by this user and not group or world writable)
+world-writable-guard rc=0 calls=0 | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 3s, possible wedge, escalation 1)
+symlink-guard rc=0 calls=0 | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 4s, possible wedge, escalation 1)
+relative-path-guard rc=0 calls=0 | stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 23s, possible wedge, escalation 1)
+-- a failing first guard does not hide a later CRITICAL one
+rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 7s, possible wedge, escalation 1; guard b-ticket still reports CRITICAL (ticket 7 is held by a live job) after its consecutive-deferral cap, so recheck the lane)
+[2026-10-09T15:10:55-0700] absorbed non-terminal stale (provably working): fm-lab-guardlive-1313-20541:w1:p1
+[2026-10-09T15:11:07-0700] absorbed non-terminal stale (guard b-ticket reports CRITICAL, deferral 1 of 1, idle 10s): fm-lab-guardlive-1313-20541:w1:p1
+-- control chars / long multi-line reason are sanitized to one wake line
+rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 4s, possible wedge, escalation 1; guard noisy still reports CRITICAL (line one [31m red) after its consecutive-deferral cap, so recheck the lane)
+
+##### S6: activity inside the deferral run ends the run (pane output changes -> record cleared)
+before activity: .guard-deferrals = 1
+after activity:  .guard-deferrals = <cleared>
+DONE

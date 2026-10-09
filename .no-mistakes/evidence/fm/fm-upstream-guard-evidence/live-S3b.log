@@ -1,0 +1,11 @@
+##### S3 (continued): record after the restart's own rearm check was acked
+durable .guard-deferrals = 1
+second restart rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 2s, possible wedge, escalation 1; guard ticket still reports CRITICAL (ticket 7 is held by a live job) after its consecutive-deferral cap, so recheck the lane)
+[2026-10-09T15:12:55-0700] absorbed non-terminal stale (provably working): fm-lab-guardlive-1313-20541:w1:p1
+[2026-10-09T15:13:09-0700] absorbed non-terminal stale (guard ticket reports CRITICAL, deferral 1 of 3, idle 12s): fm-lab-guardlive-1313-20541:w1:p1
+[2026-10-09T15:13:58-0700] absorbed non-terminal stale (guard ticket reports CRITICAL, deferral 2 of 3, idle 48s): fm-lab-guardlive-1313-20541:w1:p1
+[2026-10-09T15:14:02-0700] absorbed non-terminal stale (guard ticket reports CRITICAL, deferral 3 of 3, idle 3s): fm-lab-guardlive-1313-20541:w1:p1
+total guard calls: 4 (expect 4 = 3 deferrals + capped escalation)
+escalation count: 1
+DONE

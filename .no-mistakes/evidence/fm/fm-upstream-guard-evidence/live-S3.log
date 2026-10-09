@@ -1,0 +1,12 @@
+##### S3 (rerun): deferral run survives a watcher restart (kill -9 mid-run, cap=3)
+killed watcher; durable record: .guard-deferrals = 1
+-- state after kill:
+.watch.lock
+.watch.lock.owner.yVPgwL
+restarted watcher rc=0
+-- restarted watcher stdout:
+check: rearm-resurface
+[2026-10-09T15:12:55-0700] absorbed non-terminal stale (provably working): fm-lab-guardlive-1313-20541:w1:p1
+[2026-10-09T15:13:09-0700] absorbed non-terminal stale (guard ticket reports CRITICAL, deferral 1 of 3, idle 12s): fm-lab-guardlive-1313-20541:w1:p1
+total guard calls: 1
+DONE

@@ -1,0 +1,14 @@
+##### S5: dead endpoint (pi killed back to a leftover shell) with an armed CRITICAL guard
+dead pane: w1:p2
+agent status before kill: idle
+agent get after kill: agent_not_found
+rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p2 (idle 7s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once and not re-escalated while it stays that way - reconcile this record, and check for unlanded work before any cleanup)
+guard calls: 0
+no .guard-deferrals record
+
+##### S5b: missing endpoint (recorded pane id that does not exist in the session)
+rc=1
+guard calls: 0
+no .guard-deferrals record
+DONE

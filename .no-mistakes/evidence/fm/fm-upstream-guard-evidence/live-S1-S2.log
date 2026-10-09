@@ -1,0 +1,36 @@
+##### S1: guard exists, NO config/wedge-evidence-guards -> zero calls, unchanged wording
+config absent: yes
+run 1 rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 4s, possible wedge, escalation 1)
+run 2 rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 4s, possible wedge, escalation 2)
+run 3 rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 23s, possible wedge, escalation 3, demand-deep-inspection: same pane has wedge-escalated 3 times in a row - do not re-absorb on the run-step/pane state alone)
+guard calls: 0
+no .guard-deferrals record
+
+##### S1b: armed control, same lane, config present, FM_WEDGE_GUARD_DEFER_MAX=0
+rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 4s, possible wedge, escalation 1; guard ticket still reports CRITICAL (ticket 7 is held by a live job) after its consecutive-deferral cap, so recheck the lane)
+guard calls: 1
+wedge fm-lab-guardlive-1313-20541:w1:p1 --json
+
+##### S2: CRITICAL guard, cap=2 (one watcher process)
+rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 3s, possible wedge, escalation 1; guard ticket still reports CRITICAL (ticket 7 is held by a live job) after its consecutive-deferral cap, so recheck the lane)
+-- triage log:
+[2026-10-09T14:57:35-0700] absorbed non-terminal stale (provably working): fm-lab-guardlive-1313-20541:w1:p1
+[2026-10-09T14:57:38-0700] absorbed non-terminal stale (guard ticket reports CRITICAL, deferral 1 of 2, idle 2s): fm-lab-guardlive-1313-20541:w1:p1
+[2026-10-09T14:57:41-0700] absorbed non-terminal stale (guard ticket reports CRITICAL, deferral 2 of 2, idle 2s): fm-lab-guardlive-1313-20541:w1:p1
+-- guard calls (3):
+wedge fm-lab-guardlive-1313-20541:w1:p1 --json
+wedge fm-lab-guardlive-1313-20541:w1:p1 --json
+wedge fm-lab-guardlive-1313-20541:w1:p1 --json
+-- escalation count file: 1
+no .guard-deferrals record after escalation (run ended)
+-- queued wake:
+stale	fm-lab-guardlive-1313-20541:w1:p1	stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 3s, possible wedge, escalation 1; guard ticket still reports CRITICAL (ticket 7 is held by a live job) after its consecutive-deferral cap, so recheck the lane)
+-- second window run (guard still CRITICAL): escalation climbs once per cap+1
+rc=0
+stale: fm-lab-guardlive-1313-20541:w1:p1 (idle 4s, possible wedge, escalation 2; guard ticket still reports CRITICAL (ticket 7 is held by a live job) after its consecutive-deferral cap, so recheck the lane)
+DONE

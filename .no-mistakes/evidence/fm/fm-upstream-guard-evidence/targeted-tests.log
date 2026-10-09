@@ -1,0 +1,12 @@
+=== test_wedge_guards_absent_config_keeps_the_unchanged_ladder
+ok - with config/wedge-evidence-guards absent no guard runs and the ladder, timing and wording are unchanged
+exit=
+=== test_wedge_guard_critical_defers_one_window_at_a_time_up_to_the_cap
+ok - a CRITICAL guard defers one window at a time, the cap escalates naming the guard, and the run survives a restart
+exit=
+=== test_wedge_guard_failures_fail_open
+ok - a guard that times out, fails, answers malformed, UNKNOWN or WARNING, or is untrusted leaves the ladder unchanged
+exit=
+=== test_wedge_guard_never_defers_a_gone_endpoint
+ok - a gone endpoint is reported before any guard is asked, so a guard never defers it
+exit=
