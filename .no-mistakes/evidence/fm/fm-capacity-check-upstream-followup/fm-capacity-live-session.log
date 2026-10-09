@@ -1,0 +1,210 @@
+### no config (absent target)
+capacity: free_lanes=unknown reason=no-target lanes=2 target=none secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running, no target set (config/lane-capacity absent).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+[exit=0]
+
+### config bytes:    5  
+                                                        
+capacity: free_lanes=0 reason=cpu lanes=2 target=5 secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running of 5 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+[exit=0]
+
+### config bytes:    2  
+                                                        
+capacity: free_lanes=0 reason=cpu lanes=2 target=2 secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running of 2 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+[exit=0]
+
+### config bytes:    1  
+                                                        
+capacity: free_lanes=0 reason=cpu lanes=2 target=1 secondmates=1 load1=25.68 cores=8 mem_free_pct=62 disk_free_mb=56283
+Lanes: 2 running of 1 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 62%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+[exit=0]
+
+### config bytes:    0  
+                                                        
+capacity: free_lanes=0 reason=cpu lanes=2 target=0 secondmates=1 load1=25.68 cores=8 mem_free_pct=62 disk_free_mb=56283
+Lanes: 2 running of 0 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 62%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+[exit=0]
+
+### config bytes:            3      
+                                            
+capacity: free_lanes=0 reason=cpu lanes=2 target=3 secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running of 3 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+[exit=0]
+
+### config bytes:   	   4    
+                                                
+capacity: free_lanes=0 reason=cpu lanes=2 target=4 secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running of 4 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+[exit=0]
+
+### config bytes:    3  
+   4  
+                                                
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+[exit=1]
+
+### config bytes:    1       2  
+                                                
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+[exit=1]
+
+### config bytes:    9   9   9   9   9   9   9   9   9   9   9   9   9   9   9   9
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+[exit=1]
+
+### config bytes:    -   1  
+                                                    
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+[exit=1]
+
+### config bytes:    3   .   5  
+                                                
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+[exit=1]
+
+### config bytes:    l   o   t   s  
+                                            
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=25.68 cores=8 mem_free_pct=61 disk_free_mb=56283
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 61%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+[exit=1]
+
+### config bytes:   
+                                                            
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=25.68 cores=8 mem_free_pct=62 disk_free_mb=56283
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 62%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+[exit=1]
+
+### config bytes:    0   x   1   0  
+                                            
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=25.68 cores=8 mem_free_pct=62 disk_free_mb=56283
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 62%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+[exit=1]
+
+### config bytes:    0   0   7  
+                                                
+capacity: free_lanes=0 reason=cpu lanes=2 target=7 secondmates=1 load1=25.68 cores=8 mem_free_pct=62 disk_free_mb=56283
+Lanes: 2 running of 7 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 62%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+[exit=0]
+
+### config bytes:    1   2   3   4   5   6   7   8   9   0  
+                    
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=25.68 cores=8 mem_free_pct=62 disk_free_mb=56283
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 25.68 on 8 cores, memory free 62%, disk free 56283 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+[exit=1]
+
+### --help
+fm-capacity.sh - report open lanes and host headroom for queued-work dispatch.
+
+Read-only, fast, and network-free: it reads this home's state/*.meta and
+optional config/lane-capacity, then probes the host. It never spawns,
+writes, or locks anything.
+
+Output: the first line is machine-readable, one space-separated key=value
+list in this fixed order:
+  capacity: free_lanes=<N|unknown> reason=<reason> lanes=<N> target=<N|none|invalid>
+    secondmates=<N> load1=<X|unknown> cores=<N|unknown>
+    mem_free_pct=<N|unknown> disk_free_mb=<N|unknown>
+(one physical line). A short human summary follows it.
+
+lanes counts task metadata records whose kind is not secondmate (ship and
+scout work, including records not yet reconciled after an endpoint died).
+secondmates counts persistent secondmates separately; they hold no lane.
+
+target comes only from config/lane-capacity: one non-negative integer, the
+number of concurrent lanes this home should run. Absent means no target, so
+free_lanes=unknown reason=no-target and the counts are still printed; the
+script never invents a target. A malformed file reports target=invalid
+reason=invalid-target, names the problem on stderr, and exits 1.
+
+With a target, free_lanes is target minus lanes (never below 0), unless the
+host is constrained, in which case free_lanes=0 and reason names every
+constraint, comma-separated, in the order cpu,memory,disk:
+  cpu     1-minute load average >= logical cores
+  memory  free-memory percentage < 10
+  disk    free space on the filesystem holding FM_HOME < 5120 MB
+Otherwise reason is ok when free_lanes > 0 and full when it is 0.
+
+Probes degrade gracefully: an unavailable probe prints unknown and its
+constraint is not evaluated. Darwin reads sysctl (vm.loadavg,
+kern.memorystatus_level, hw.logicalcpu); other systems read /proc/loadavg
+and /proc/meminfo (MemAvailable/MemTotal); cores come from getconf with a
+sysctl fallback; disk comes from df -Pk.
+
+Environment: FM_HOME, FM_STATE_OVERRIDE, and FM_CONFIG_OVERRIDE resolve the
+home exactly as the other bin/ scripts do.
+
+Exit status: 0 on a report, 1 on an invalid config/lane-capacity, 2 on a
+usage error.
+[exit=0]
+
+### bad arg
+usage: fm-capacity.sh [--help]
+[exit=2]
+

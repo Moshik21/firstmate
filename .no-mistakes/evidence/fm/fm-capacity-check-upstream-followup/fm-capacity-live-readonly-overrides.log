@@ -1,0 +1,9 @@
+### read-only: tree listing + checksums before/after
+capacity: free_lanes=0 reason=cpu lanes=1 target=3 secondmates=0 load1=22.04 cores=8 mem_free_pct=65 disk_free_mb=56251
+home unchanged: PASS
+
+### FM_STATE_OVERRIDE/FM_CONFIG_OVERRIDE take precedence (home has 1 lane/target 3; overrides 3 lanes/target 9)
+capacity: free_lanes=0 reason=cpu lanes=3 target=9 secondmates=0 load1=22.04 cores=8 mem_free_pct=65 disk_free_mb=56251
+
+### dead-endpoint meta (kind=ship, no live pane) still counts as a lane; unknown kind counts as lane
+capacity: free_lanes=0 reason=cpu lanes=3 target=3 secondmates=0 load1=22.04 cores=8 mem_free_pct=65 disk_free_mb=56251
