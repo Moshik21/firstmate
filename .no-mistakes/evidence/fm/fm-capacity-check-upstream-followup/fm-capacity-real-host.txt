@@ -1,0 +1,87 @@
+### S1: no config/lane-capacity, real host probes, 3 ships + 1 secondmate
+capacity: free_lanes=unknown reason=no-target lanes=3 target=none secondmates=1 load1=11.12 cores=8 mem_free_pct=44 disk_free_mb=43960
+Lanes: 3 running, no target set (config/lane-capacity absent).
+Secondmates: 1 (hold no lane).
+Host: load 11.12 on 8 cores, memory free 44%, disk free 43960 MB.
+rc=0
+
+### S2: add config/lane-capacity=5, real host
+capacity: free_lanes=0 reason=cpu lanes=3 target=5 secondmates=1 load1=11.12 cores=8 mem_free_pct=44 disk_free_mb=43960
+Lanes: 3 running of 5 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 11.12 on 8 cores, memory free 44%, disk free 43960 MB.
+Constrained: cpu - hold new dispatch until it clears.
+rc=0
+
+### S3: invalid values
+-- value: 0000000    l   o   t   s  
+                                            
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=11.12 cores=8 mem_free_pct=44 disk_free_mb=43960
+Lanes: 3 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 11.12 on 8 cores, memory free 44%, disk free 43960 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+rc=1
+-- value: 0000000    3  
+   4  
+                                                
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=11.12 cores=8 mem_free_pct=44 disk_free_mb=43959
+Lanes: 3 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 11.12 on 8 cores, memory free 44%, disk free 43959 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+rc=1
+-- value: 0000000    1       2  
+                                                
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=11.12 cores=8 mem_free_pct=41 disk_free_mb=43959
+Lanes: 3 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 11.12 on 8 cores, memory free 41%, disk free 43959 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+rc=1
+-- value: 0000000    9   9   9   9   9   9   9   9   9   9   9   9   9   9   9   9
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=11.12 cores=8 mem_free_pct=41 disk_free_mb=43959
+Lanes: 3 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 11.12 on 8 cores, memory free 41%, disk free 43959 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+rc=1
+-- value: 0000000    -   1  
+                                                    
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=11.12 cores=8 mem_free_pct=42 disk_free_mb=43959
+Lanes: 3 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 11.12 on 8 cores, memory free 42%, disk free 43959 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+rc=1
+-- value: 0000000   
+                                                            
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=11.12 cores=8 mem_free_pct=42 disk_free_mb=43959
+Lanes: 3 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 11.12 on 8 cores, memory free 42%, disk free 43959 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+rc=1
+
+### S4: surrounding whitespace tolerated
+capacity: free_lanes=0 reason=cpu lanes=3 target=3 secondmates=1 load1=11.12 cores=8 mem_free_pct=41 disk_free_mb=43959
+Lanes: 3 running of 3 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 11.12 on 8 cores, memory free 41%, disk free 43959 MB.
+Constrained: cpu - hold new dispatch until it clears.
+rc=0
+
+### S5: --help and bad usage
+fm-capacity.sh - report open lanes and host headroom for queued-work dispatch.
+
+Read-only, fast, and network-free: it reads this home's state/*.meta and
+optional config/lane-capacity, then probes the host. It never spawns,
+writes, or locks anything.
+usage: fm-capacity.sh [--help]
+rc=2

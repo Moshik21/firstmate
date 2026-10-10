@@ -1,0 +1,6 @@
+not ok - the hold-dispatch line is opt-in on config/lane-capacity (unexpected: 'Constrained:')
+--- output ---
+capacity: free_lanes=unknown reason=no-target lanes=1 target=none secondmates=0 load1=9.50 cores=8 mem_free_pct=9 disk_free_mb=1024
+Lanes: 1 running, no target set (config/lane-capacity absent).
+Host: load 9.50 on 8 cores, memory free 9%, disk free 1024 MB.
+Constrained: cpu,memory,disk - hold new dispatch until it clears.
