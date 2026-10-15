@@ -218,9 +218,12 @@ test_an_inventory_mismatch_asks_the_mate_once_per_window() {
     || fail "the ask did not land as exactly one durable steering record"
   assert_contains "$(inbox_text "$home/state" mate)" "check your current books" \
     "the instruction did not ask the mate to inspect its current state"
-  if printf '%s' "$(inbox_text "$home/state" mate)" | grep -Fq 'stale-scout'; then
-    fail "the instruction prescribed a repair from sampled details that can become stale"
-  fi
+  # The ask names the mismatch kind and the flagged ids (so the mate checks the
+  # right thing) while still only asking for a check against its current books.
+  assert_contains "$(inbox_text "$home/state" mate)" "orphan_in_flight" \
+    "the instruction did not name the mismatch kind"
+  assert_contains "$(inbox_text "$home/state" mate)" "stale-scout, watch-row" \
+    "the instruction did not name the flagged ids"
 
   # Every later recap sees the same mismatch; none of them may nag.
   out=$(run_notify "$home" "$fakebin" once "$snap") || fail "the repeat run failed: $out"
@@ -483,19 +486,29 @@ test_a_delayed_snapshot_never_prescribes_a_stale_repair() {
     || fail "the delayed reconcile ask failed: $out"
   assert_contains "$out" "sent: mate orphan_in_flight" \
     "the delayed snapshot did not produce the cooldown-limited check: $out"
-  out=$(run_notify "$home" "$fakebin" delayed "$new_snap") \
-    || fail "the current snapshot reconcile failed: $out"
+  # The same flagged set seen again inside the window stays quiet.
+  out=$(run_notify "$home" "$fakebin" delayed "$old_snap") \
+    || fail "the repeated snapshot reconcile failed: $out"
   assert_contains "$out" "cooldown: mate" \
-    "the per-home cooldown did not deduplicate the newer observation: $out"
+    "the per-home cooldown did not deduplicate the same mismatch: $out"
   [ "$(inbox_records "$home/state" mate)" -eq 1 ] \
-    || fail "the old and new snapshots produced more than one ask inside the cooldown"
+    || fail "the same mismatch produced more than one ask inside the cooldown"
   text=$(inbox_text "$home/state" mate)
   assert_contains "$text" "check your current books" \
     "the delayed ask did not direct the mate to current state"
-  if printf '%s' "$text" | grep -Eq 'already-repaired|current-row'; then
-    fail "the delayed ask embedded sampled row details and could prescribe a stale repair: $text"
-  fi
-  pass "a delayed snapshot asks for a current check instead of prescribing a stale repair"
+  assert_contains "$text" "Skip any that no longer apply" \
+    "the delayed ask did not let the mate skip rows that already changed"
+  # A DIFFERENT flagged set restarts the window, so a new mismatch is never
+  # muted by an old nudge; the new ask names the new kind and ids.
+  out=$(run_notify "$home" "$fakebin" delayed "$new_snap") \
+    || fail "the changed snapshot reconcile failed: $out"
+  assert_contains "$out" "sent: mate unowned_current" \
+    "a changed mismatch inside the window was muted by the old nudge: $out"
+  [ "$(inbox_records "$home/state" mate)" -eq 2 ] \
+    || fail "the changed mismatch did not produce its own ask"
+  assert_contains "$(inbox_text "$home/state" mate)" "current-row" \
+    "the second ask did not name the new flagged id"
+  pass "a delayed snapshot asks for a current check, and a changed mismatch restarts the window"
 }
 
 test_a_stale_snapshot_never_targets_a_replacement_mate() {
