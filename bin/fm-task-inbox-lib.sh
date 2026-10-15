@@ -439,19 +439,40 @@ _fm_task_inbox_ring_log() {  # <record-path> <decision> [detail]
   return 0
 }
 
+# Whether a Herdr composer read <held> is our own doorbell <line>: equal to it
+# ignoring whitespace and wrapping, or the shape Claude leaves when it collapses
+# the burst typed by the Herdr typing path - one bare `[Pasted text #N]`
+# placeholder, optionally followed by a literal tail that is the end of <line>.
+# A `+M lines` placeholder or several placeholders are an operator's paste, not
+# a single-line doorbell, and are never recognised.
+_fm_task_inbox_herdr_holds_doorbell() {  # <line> <held>
+  local line=$1 held=$2 rest
+  fm_composer_normalize_spaces_var line
+  fm_composer_normalize_spaces_var held
+  line=${line//[$' \t\r\n\v\f']/}
+  line=${line//$'\xE2\x81\xA3'/}
+  held=${held//[$' \t\r\n\v\f']/}
+  held=${held//$'\xE2\x81\xA3'/}
+  [ -n "$line" ] && [ -n "$held" ] || return 1
+  [ "$held" = "$line" ] && return 0
+  [[ $held =~ ^\[Pastedtext#[0-9]+\](.*)$ ]] || return 1
+  rest=${BASH_REMATCH[1]}
+  [ -n "$rest" ] || return 0
+  case "$rest" in *'[Pastedtext#'*) return 1 ;; esac
+  [[ $line == *"$rest" ]]
+}
+
 # Whether the composer's content is exactly <line>, ignoring line wrapping.
-# Herdr reads its composer with the same visible-viewport reader and payload
-# equivalence its typing path uses to prove a typed doorbell before Enter
-# (fm_backend_herdr_composer_content, fm_backend_herdr_composer_payload_shown),
-# so a doorbell that path typed - wrapped, or collapsed into a `[Pasted text
-# #N]` placeholder - is recognised as our own rather than skipped as someone
-# else's draft. Other backends compare a plain capture.
+# Herdr reads its composer with the same visible-viewport reader its typing
+# path uses (fm_backend_herdr_composer_content), so a doorbell that path typed
+# - wrapped, or collapsed into a placeholder - is recognised as our own rather
+# than skipped as someone else's draft. Other backends compare a plain capture.
 fm_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
   local cap held
   fm_backend_source "$1" || return 1
   if [ "$1" = herdr ]; then
     held=$(fm_backend_herdr_composer_content "$2" 2>/dev/null) || return 1
-    fm_backend_herdr_composer_payload_shown "$3" "$held"
+    _fm_task_inbox_herdr_holds_doorbell "$3" "$held"
     return
   fi
   cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 1
