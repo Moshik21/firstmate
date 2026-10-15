@@ -1,0 +1,66 @@
+=== C0: inbox-status leg, real control script on a seeded home ===
+schema=fm-inbox-status.v1
+unhandled=1
+oldest_age=214233805
+corr_state=unhandled
+composer=unknown
+--- unknown corr:
+corr_state=absent
+--- malformed corr:
+error: invalid correlation id: zz
+rc=1
+--- after handled:
+unhandled=0
+corr_state=handled
+=== U1: idle-never-busy + request unread 301s after delivery => ONE pending-reply-unread under existing key ===
+    phase=awaiting_report delivered_epoch=1792095808 delivery_reconcile= delivery_resend_epoch= unread_escalated_epoch=
+usage: paste [-s] [-d delimiters] file ...
+  t+60s: status lines with unread:   phase=awaiting_report request_turn_completed=
+  t+301/t+400s:
+    phase=awaiting_report delivered_epoch=1792095808 delivery_reconcile= delivery_resend_epoch= unread_escalated_epoch=1792096109
+  request_turn_completed= recovery_sent=
+blocked [key=pending-reply-5317520e5fda8d09] [at=1792095810]: pending-reply-unread: task=rsm pending-reply-id=5317520e5fda8d09 landed 5m ago, unread (1 unhandled, oldest 0m; composer unknown); remedy: fm-peek.sh rsm, then fm-send.sh rsm --key Enter request=please rename the metric
+  unread escalation lines: 1
+blocked [key=pending-reply-5317520e5fda8d09] [at=1792095810]: pending-reply-unread: task=rsm pending-reply-id=5317520e5fda8d09 landed 5m ago, unread (1 unhandled, oldest 0m; composer unknown); remedy: fm-peek.sh rsm, then fm-send.sh rsm --key Enter request=please rename the metric
+=== U2: request already handled by mate (acked) => idle counts as completed turn, no unread ===
+  request_turn_completed=1792096215 unread_escalated= phase=awaiting_report
+=== D1: ssh lost AFTER the remote leg ran (landed, completion unknown) => reconcile marks delivered, NO resend ===
+send rc=1
+    phase=delivery_unknown delivered_epoch= delivery_reconcile= delivery_resend_epoch= unread_escalated_epoch=
+    undelivered-text kept: 1  remote inbox records: 1
+    phase=awaiting_report delivered_epoch=1792095834 delivery_reconcile=landed delivery_resend_epoch= unread_escalated_epoch=
+    remote inbox records after tick: 1; undelivered-text left: 0
+=== D2: ssh never reached the host (absent) => ONE same-correlation resend, inbox gets the record, delivery-unknown closes ===
+send rc=1
+    phase=delivery_unknown delivered_epoch= delivery_reconcile= delivery_resend_epoch= unread_escalated_epoch=
+    remote inbox records: 0
+    phase=awaiting_report delivered_epoch=1792095839 delivery_reconcile=resent delivery_resend_epoch=1792095837 unread_escalated_epoch=
+    remote inbox records after tick: 1
+    records carrying original corr: 1
+    after 2 more ticks, remote inbox records: 1
+=== D3: absent but older than 2h => never resent, stays open ===
+    phase=escalated delivered_epoch= delivery_reconcile=absent delivery_resend_epoch= unread_escalated_epoch=
+    remote inbox records: 0  text kept: 0
+=== D4: failed inbox read (ssh down) => nothing changes ===
+    CHANGED
+19d18
+< escalated_epoch=
+27c26,27
+< phase=delivery_unknown
+---
+> escalated_epoch=1792095848
+> phase=escalated
+    phase=escalated delivered_epoch= delivery_reconcile= delivery_resend_epoch= unread_escalated_epoch=
+    remote inbox records: 0
+=== D5: absent but text-less (stored text missing) => never resent ===
+    phase=escalated delivered_epoch= delivery_reconcile=absent delivery_resend_epoch= unread_escalated_epoch=
+    remote inbox records: 0
+=== D6: escalated delivery-unknown decision open; mate reachable and record absent => one resend, decision closes ===
+    phase=escalated delivered_epoch= delivery_reconcile= delivery_resend_epoch= unread_escalated_epoch=
+  open decision lines:
+blocked [key=pending-reply-54274bd1c85a738f] [at=1792095861]: pending-reply-delivery-unknown: task=rsm pending-reply-id=54274bd1c85a738f request=please rename the metric
+    phase=awaiting_report delivered_epoch=1792095864 delivery_reconcile=resent delivery_resend_epoch=1792095862 unread_escalated_epoch=
+    remote inbox records: 1
+  lines after reconcile:
+blocked [key=pending-reply-54274bd1c85a738f] [at=1792095861]: pending-reply-delivery-unknown: task=rsm pending-reply-id=54274bd1c85a738f request=please rename the metric
+resolved [key=pending-reply-54274bd1c85a738f] [at=1792095864]: pending-reply-resolved: task=rsm pending-reply-id=54274bd1c85a738f via=delivery-reconciled resent

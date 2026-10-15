@@ -1,0 +1,7 @@
+wrapped literal => match
+bare single placeholder => match
+placeholder + tail => match
+placeholder + foreign tail => nomatch
+multi-line paste +N lines => nomatch
+two placeholders => nomatch
+operator draft => nomatch

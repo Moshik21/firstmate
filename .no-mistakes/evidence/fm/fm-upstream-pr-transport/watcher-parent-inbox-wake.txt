@@ -1,0 +1,13 @@
+=== W1 remote secondmate home with 1 old unhandled parent-route record (+1 more) ===
+check: parent instruction waiting: 2 unhandled in /tmp/fmt/w-w1/state/parent-route/mate1.inbox, oldest 214233736s; read and act on each in numeric order, then mv each into its handled/
+--- marker: 001.msg
+--- wake queue:
+.wake-queue
+.wake-queue.seq
+1792095736	1	check	parent-inbox-mate1-001	check: parent instruction waiting: 2 unhandled in /tmp/fmt/w-w1/state/parent-route/mate1.inbox, oldest 214233736s; read and act on each in numeric order, then mv each into its handled/
+=== W1b: second watcher run, same oldest record => no second wake ===
+check: rearm-resurface
+--- queue lines count: 1
+=== W2 main home (no marker) with same inbox => no wake ===
+/Users/konnermoshier/.no-mistakes/worktrees/889b963008ec/01M50JGRF6C708YPXVWP9GR8BR/bin/fm-wake-lib.sh: line 584: 50007 Terminated: 15          sleep "$POLL"
+--- queue: 0

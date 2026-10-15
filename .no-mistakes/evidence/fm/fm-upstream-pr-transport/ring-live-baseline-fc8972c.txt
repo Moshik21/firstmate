@@ -1,0 +1,35 @@
+claude idle in fm-lab-ringlive-93888-1700:w1:p1 (2.1.301 (Claude Code))
+=== S1: stuck own doorbell: typed (send-text, no Enter), then ring ===
+--- composer before ring:
+
+
+
+
+
+                                                                                                     ● high · /effort
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'mate.inbox' steering inbox, read and act on
+  each in numeric order, then mv each into its handled/.
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+composer_content=[: Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'mate.inbox' steering inbox, read and act on each in numeric order, then mv each into its handled/.]
+composer_state=pending
+composer_holds=YES
+ring rc=0
+--- screen after ring:
+7:❯ : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'mate.inbox' steering inbox, read and act on
+--- ring-log:
+cat: /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-ringlive.1tygUV/state/mate.inbox/.ring-log: No such file or directory
+=== S2: operator's own half-typed draft: ring must skip and leave it ===
+9:❯ operator draft do not submit
+ring rc=1 (expect 1)
+--- composer after:
+9:❯ operator draft do not submit
+=== S3: operator multi-line paste draft (placeholder): ring must skip ===
+composer_content=[line one of my notes line two of my notes line three of my notes line four]
+ring rc=1 (expect 1)
+--- after:
+6:❯ line one of my notes
+--- ring-log:
+cat: /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-ringlive.1tygUV/state/mate.inbox/.ring-log: No such file or directory
