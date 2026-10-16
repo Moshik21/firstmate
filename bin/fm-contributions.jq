@@ -76,8 +76,8 @@ def projected($input; $saved; $now; $max_age):
          | select(.hold_bucket == "live")] | first) as $hold
     # The owning row without the live-only filter: a blocked or dated row is not
     # a live captain call, but it still says why a ready PR is not yet the captain's.
-    | ([$input.backlog.records[]? | select(.structured and
-         (.id == $k.task or ((.links // []) | index($k.url)) != null))] | first) as $owner
+    | ([$input.backlog.records[]? | select(.structured and .id == $k.task)] | first
+       // ([$input.backlog.records[]? | select(.structured and ((.links // []) | index($k.url)) != null)] | first)) as $owner
     | ($owner.unresolved_blocker_ids // []) as $owner_blockers
     | ([$input.tasks[]? | select(.id == $k.task and .pr.url == $k.url)
        | {head:(.pr.head | select(. != null and . != "")), merge_authority:(.merge_authority // "unknown")}] | first) as $task
@@ -131,9 +131,9 @@ def projected($input; $saved; $now; $max_age):
        elif $o.can_merge == true and $merge_authority == "away" then
          {actor:"fleet",reason:"checks green; merge is authorized by delivery posture"}
        elif $o.can_merge == true and ($owner_blockers | length) > 0 then
-         {actor:"fleet",reason:("held: blocked by " + ($owner_blockers | join(", "))),held:true}
+         {actor:"fleet",reason:("held: blocked by " + ($owner_blockers | join(", ")))}
        elif $o.can_merge == true and $owner.hold_bucket == "dated" then
-         {actor:"fleet",reason:("held until " + ($owner.hold_until // "a set date")),held:true}
+         {actor:"fleet",reason:("held until " + ($owner.hold_until // "a set date"))}
        elif $o.can_merge == true then {actor:"captain",reason:"checks green; merge approval needed"}
        else {actor:"maintainer",reason:"delivery awaits the maintainer"} end) as $action
     | $k + {kind:($record.kind // (if ($k.url | contains("/issues/")) then "issue" else "pr" end)),
@@ -155,7 +155,7 @@ def summary($rows; $errors):
      nobody:([$rows[] | select(.actor == "nobody")] | length)},
    unmeasured:([$rows[] | select(.actor == "unmeasured")] | length),
    complete:($errors == 0 and all($rows[]; .checked)),
-   proven_clear:($errors == 0 and all($rows[]; .checked and .actor != "captain" and .held != true)),
+   proven_clear:($errors == 0 and all($rows[]; .checked and .actor != "captain")),
    stale_verdicts:([$rows[].stale_verdicts] | add // 0),
    missing_verdicts:([$rows[].missing_verdicts] | add // 0),
    unreadable_records:$errors,

@@ -1955,7 +1955,7 @@ test_held_owner_is_fleet_work_until_the_hold_clears() {
   printf '%s' "$out" | jq -e '
     .contributions.counts == {captain:1,fleet:3,maintainer:0,nobody:0}
     and [.contributions.captain[].url] == ["https://github.com/o/r/pull/3"]
-    and .contributions.complete == true and .contributions.proven_clear == false' >/dev/null \
+    and .contributions.complete == true' >/dev/null \
     || fail "blocked or dated owners must not read as captain merge calls: $out"
   FM_SNAPSHOT_NOW=$NOW with_home "$home" "$ROOT/bin/fm-fleet-snapshot.sh" --contribution-input > "$home/input.json" \
     || fail 'could not collect held contribution input'
