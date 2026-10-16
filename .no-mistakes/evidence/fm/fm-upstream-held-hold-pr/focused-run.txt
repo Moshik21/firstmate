@@ -1,0 +1,4 @@
+ok - a blocked or dated owner holds a ready PR as fleet work until the hold clears
+ok - owner row with id==task wins over a blocked row that only links the PR
+ok - only required-captain contributions are rows; other actors are counted
+ok - away yolo delivery is fleet work without granting merge authority
