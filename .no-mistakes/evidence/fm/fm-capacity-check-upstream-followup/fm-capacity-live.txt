@@ -1,0 +1,70 @@
+### S1 no lane-capacity, 2 ship metas + 1 secondmate
+capacity: free_lanes=unknown reason=no-target lanes=2 target=none secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running, no target set (config/lane-capacity absent).
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+exit=0
+### S2 target=5
+capacity: free_lanes=3 reason=ok lanes=2 target=5 secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running of 5 target, 3 open.
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+exit=0
+### S3 target=1 (full, never negative)
+capacity: free_lanes=0 reason=full lanes=2 target=1 secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running of 1 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+exit=0
+### S4 malformed: two-line, '1 2', 99999999999999999999, abc, empty, negative
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+exit=1
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+exit=1
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+exit=1
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+exit=1
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+exit=1
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+exit=1
+### S5 padded ' 4 ' accepted
+capacity: free_lanes=2 reason=ok lanes=2 target=4 secondmates=1 load1=6.92 cores=8 mem_free_pct=61 disk_free_mb=115558
+Lanes: 2 running of 4 target, 2 open.
+Secondmates: 1 (hold no lane).
+Host: load 6.92 on 8 cores, memory free 61%, disk free 115558 MB.
+exit=0
+### S6 usage
+usage: fm-capacity.sh [--help]
+exit=2
+fm-capacity.sh - report open lanes and host headroom for queued-work dispatch.
+
+Read-only, fast, and network-free: it reads this home's state/*.meta and
+optional config/lane-capacity, then probes the host. It never spawns,
+writes, or locks anything.
+exit=0
