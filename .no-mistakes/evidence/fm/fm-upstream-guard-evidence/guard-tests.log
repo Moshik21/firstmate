@@ -1,0 +1,5 @@
+ok - with config/wedge-evidence-guards absent no guard runs and the ladder, timing and wording are unchanged
+ok - a CRITICAL guard defers one window at a time, the cap escalates naming the guard, and the run survives a restart
+ok - a guard that times out, fails, answers malformed, UNKNOWN or WARNING, or is untrusted leaves the ladder unchanged
+ok - a gone endpoint is reported before any guard is asked, so a guard never defers it
+bash tests/.tmp-guards-only.test.sh  26.54s user 44.55s system 72% cpu 1:38.09 total

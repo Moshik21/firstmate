@@ -1,0 +1,18 @@
+ok - consecutive wedge escalations on the same pane accumulate and demand deep inspection at the threshold
+rc= test_wedge_escalation_marks_demand_deep_inspection_after_threshold
+ok - a pane becoming active again resets the consecutive wedge-escalation counter
+rc= test_wedge_escalation_resets_when_pane_becomes_active
+ok - a record whose endpoint is dead or missing reports itself once and is never re-escalated
+rc= test_gone_endpoint_reports_once_instead_of_escalating_forever
+ok - a live wedged agent, an unattributable one, and an unreadable endpoint escalate unchanged
+rc= test_live_and_unproven_endpoints_still_wedge_escalate
+ok - a quiet pane writing its own worktree is deferred, while one writing nothing still wedge-escalates on the unchanged schedule
+rc= test_wedge_escalation_deferred_while_worktree_is_written
+ok - matching non-terminal stale suppressors repair missing or corrupt stale-since timers
+rc= test_nonterminal_stale_repairs_missing_or_corrupt_timer
+ok - an idle-window timer repair drops a finished write-deferral chain, so the next deferral gets a fresh re-surface window
+rc= test_timer_repair_drops_a_finished_write_deferral_chain
+ok - a write deferral re-surfaces once on the bounded pause cadence, so a churning worktree cannot stay invisible
+rc= test_write_deferral_resurfaces_on_the_bounded_cadence
+ok - a declared wait is not wedge-escalated by a working verdict, while an elapsed declaration and an undeclared lane both keep the unchanged ladder
+rc= test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
