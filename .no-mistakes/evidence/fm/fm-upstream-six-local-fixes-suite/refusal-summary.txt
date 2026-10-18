@@ -1,0 +1,17 @@
+[PASS] happy-pass-recorded rc=0(want 0) merge_called=yes pat=/passing full suite/
+[PASS] refuse-behind-base rc=1(want 1) merge_called=no pat=/commit\(s\) behind it: rebase and re-validate/
+[PASS] refuse-missing-record rc=1(want 1) merge_called=no pat=/recorded no full-suite result/
+[PASS] refuse-suite-fail rc=1(want 1) merge_called=no pat=/failing full-suite/
+[PASS] refuse-stale-base-record rc=1(want 1) merge_called=no pat=/ran against base .* is now at/
+[PASS] refuse-record-no-base rc=1(want 1) merge_called=no pat=/names no base commit/
+[PASS] refuse-junk-record rc=1(want 1) merge_called=no pat=/unreadable: it must name/
+[PASS] accept-suite-none-with-reason rc=0(want 0) merge_called=yes pat=/attested the project has no full suite/
+[PASS] refuse-suite-none-no-reason rc=1(want 1) merge_called=no pat=/suite=none with no reason/
+[PASS] refuse-symlink-record rc=1(want 1) merge_called=no pat=/recorded no full-suite result/
+[PASS] refuse-compare-unreadable rc=1(want 1) merge_called=no pat=/could not be read/
+[PASS] refuse-compare-garbage rc=1(want 1) merge_called=no pat=/could not be read/
+[PASS] attended-override-waives-missing rc=0(want 0) merge_called=yes pat=/waived by --attended-override/
+[PASS] attended-override-waives-behind rc=0(want 0) merge_called=yes pat=/waived by --attended-override/
+[PASS] away-refuses-despite-override rc=1(want 1) merge_called=no pat=/recorded no full-suite result/
+--- required checks present: compare/record not consulted
+req-present rc=0 (output mentions suite/behind: 0)

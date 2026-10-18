@@ -1,0 +1,135 @@
+[PASS] happy-pass-recorded rc=0(want 0) merge_called=yes pat=/passing full suite/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | note: base branch main has no required checks; the head is not behind it and the worker recorded a passing full suite against eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+[PASS] refuse-behind-base rc=1(want 1) merge_called=no pat=/commit\(s\) behind it: rebase and re-validate/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] refuse-missing-record rc=1(want 1) merge_called=no pat=/recorded no full-suite result/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] refuse-suite-fail rc=1(want 1) merge_called=no pat=/failing full-suite/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] refuse-stale-base-record rc=1(want 1) merge_called=no pat=/ran against base .* is now at/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] refuse-record-no-base rc=1(want 1) merge_called=no pat=/names no base commit/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] refuse-junk-record rc=1(want 1) merge_called=no pat=/unreadable: it must name/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] accept-suite-none-with-reason rc=0(want 0) merge_called=yes pat=/attested the project has no full suite/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | note: base branch main has no required checks; the worker attested the project has no full suite: docs repo has no tests
+[PASS] refuse-suite-none-no-reason rc=1(want 1) merge_called=no pat=/suite=none with no reason/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] refuse-symlink-record rc=1(want 1) merge_called=no pat=/recorded no full-suite result/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] refuse-compare-unreadable rc=1(want 1) merge_called=no pat=/could not be read/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] refuse-compare-garbage rc=1(want 1) merge_called=no pat=/could not be read/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
+[PASS] attended-override-waives-missing rc=0(want 0) merge_called=yes pat=/waived by --attended-override/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | note: base branch main has no required checks; the behind-base and recorded-suite conditions are waived by --attended-override
+[PASS] attended-override-waives-behind rc=0(want 0) merge_called=yes pat=/waived by --attended-override/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | note: base branch main has no required checks; the behind-base and recorded-suite conditions are waived by --attended-override
+[PASS] away-refuses-despite-override rc=1(want 1) merge_called=no pat=/recorded no full-suite result/
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | ●  WATCHER DOWN - SUPERVISION IS OFF
+    | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    | ●  This is a supervision warning only; the guarded operation WILL still run.
+    | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    | error: refusing to merge https://github.com/example/repo/pull/9
