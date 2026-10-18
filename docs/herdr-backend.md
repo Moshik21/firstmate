@@ -648,9 +648,8 @@ An environment variable alone is not reliable when another Herdr server is runni
 
 When the selected named server is not running, the adapter launches it without these inherited values:
 
-- Firstmate home and directory overrides.
+- Every exported `FM_*` variable, including home and directory overrides, the supervision-model override, test clocks, and per-task overrides.
 - Harness identity markers.
-- The supervision-model override.
 
 Herdr passes its server startup environment to every later pane, so retaining those values could misroute panes for another Firstmate home or harness.
 An already-running server is reused without restart or environment changes.

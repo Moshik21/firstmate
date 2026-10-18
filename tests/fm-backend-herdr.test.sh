@@ -48,6 +48,14 @@ make_herdr_fakebin() {  # <dir> -> echoes fakebin dir
   cat > "$fb/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
+# The `herdr server` launch inherits no FM_* variable (fm_backend_herdr_server_ensure),
+# so the paths an earlier call carried are remembered for that call.
+CFG="${0%/*}/.paths"
+if [ -n "${FM_HERDR_LOG:-}" ]; then
+  printf '%s\n%s\n' "$FM_HERDR_LOG" "${FM_HERDR_RESPONSES:-}" > "$CFG"
+elif [ -f "$CFG" ]; then
+  { IFS= read -r FM_HERDR_LOG; IFS= read -r FM_HERDR_RESPONSES; } < "$CFG"
+fi
 LOG="${FM_HERDR_LOG:?}"
 RESP="${FM_HERDR_RESPONSES:?}"
 COUNT_FILE="$RESP/.count"
@@ -144,7 +152,7 @@ make_herdr_server_env_fakebin() {  # <dir> -> echoes fakebin dir
 set -u
 case "${1:-}" in
   status)
-    if [ -e "$FM_HERDR_SERVER_MARKER" ]; then
+    if [ -e "$HERDR_FAKE_SERVER_MARKER" ]; then
       printf '{"server":{"running":true}}\n'
     else
       printf '{"server":{"running":false}}\n'
@@ -152,13 +160,13 @@ case "${1:-}" in
     ;;
   server)
     {
-      for name in FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL FM_HERDR_SENTINEL HERDR_SESSION; do
+      for name in FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL FM_SNAPSHOT_NOW FM_CREW_STATE_META_OVERRIDE HERDR_FAKE_SENTINEL HERDR_SESSION; do
         eval 'value=${'"$name"'-<unset>}'
         printf '%s=%s\n' "$name" "$value"
       done
       printf 'args=%s\n' "$*"
-    } > "$FM_HERDR_SERVER_ENV_LOG"
-    : > "$FM_HERDR_SERVER_MARKER"
+    } > "$HERDR_FAKE_SERVER_ENV_LOG"
+    : > "$HERDR_FAKE_SERVER_MARKER"
     ;;
 esac
 SH
@@ -1214,21 +1222,23 @@ test_server_ensure_scrubs_home_and_harness_identity() {
   local dir log marker fb output name
   dir="$TMP_ROOT/server-env"; mkdir -p "$dir"; log="$dir/env"; marker="$dir/running"
   fb=$(make_herdr_server_env_fakebin "$dir")
-  PATH="$fb:$PATH" FM_HERDR_SERVER_ENV_LOG="$log" FM_HERDR_SERVER_MARKER="$marker" FM_HERDR_SENTINEL=kept \
+  PATH="$fb:$PATH" HERDR_FAKE_SERVER_ENV_LOG="$log" HERDR_FAKE_SERVER_MARKER="$marker" HERDR_FAKE_SENTINEL=kept \
     FM_HOME=/tmp/wrong-home FM_ROOT_OVERRIDE=/tmp/wrong-root FM_STATE_OVERRIDE=/tmp/wrong-state \
     FM_DATA_OVERRIDE=/tmp/wrong-data FM_PROJECTS_OVERRIDE=/tmp/wrong-projects FM_CONFIG_OVERRIDE=/tmp/wrong-config \
     CURSOR_AGENT=1 CURSOR_INVOKED_AS=cursor-agent CLAUDECODE=1 PI_CODING_AGENT=true FM_PI_HARNESS=pi-signed GROK_AGENT=1 FM_SUPERVISION_MODEL=autoarm \
+    FM_SNAPSHOT_NOW=2026-10-14T22:43:05Z FM_CREW_STATE_META_OVERRIDE=/tmp/wrong-task.meta \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_server_ensure fmtest' "$ROOT"
   expect_code 0 $? "server_ensure should start under a polluted launcher environment"
   output=$(cat "$log")
   for name in FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE \
-    CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL; do
+    CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL \
+    FM_SNAPSHOT_NOW FM_CREW_STATE_META_OVERRIDE; do
     assert_contains "$output" "$name=<unset>" "server_ensure leaked $name into the long-lived Herdr server"
   done
-  assert_contains "$output" "FM_HERDR_SENTINEL=kept" "server_ensure removed an unrelated environment variable"
+  assert_contains "$output" "HERDR_FAKE_SENTINEL=kept" "server_ensure removed an unrelated environment variable"
   assert_contains "$output" "HERDR_SESSION=fmtest" "server_ensure lost explicit Herdr session routing"
   assert_contains "$output" "args=server --session fmtest" "server_ensure lost the trailing Herdr session flag"
-  pass "fm_backend_herdr_server_ensure: scrubs home and harness identity without disturbing unrelated environment or session routing"
+  pass "fm_backend_herdr_server_ensure: scrubs every FM_* variable and harness identity without disturbing unrelated environment or session routing"
 }
 
 test_container_ensure_reuses_existing_workspace() {
