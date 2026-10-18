@@ -148,7 +148,10 @@
 #      backend's pane busy state, then the resolved status declaration
 #      when its verb maps to a recognized run-state. Decision-only events such as
 #      `resolved` never become current state or detail.
-#   5. Missing meta or torn-down worktree: report unknown · none. If no run is
+#   5. Missing meta: report unknown · none. A torn-down worktree reports
+#      unknown · none too, unless the resolved status declaration is a done the
+#      ship done gate accepts without the copy (a recorded PR), which reads done
+#      · status-log with "working copy released". If no run is
 #      attributed to this crew, a dead endpoint also reports unknown · none rather
 #      than trusting a stale status log. On tmux and herdr, which own a
 #      recovery-grade classifier, only its positive death evidence reads as gone
@@ -236,13 +239,6 @@ HARNESS=$(meta_value harness)
 REMOTE_HOST=$(meta_value remote_host)
 [ -n "$KIND" ] || KIND=ship
 
-# A torn-down (or never-created) worktree has no current state to read. A
-# remote secondmate's recorded worktree is a path on ITS host, so the local
-# probe proves nothing for it - the remote arm below reads the true source.
-if [ -z "$REMOTE_HOST" ] && { [ -z "$WT" ] || [ ! -d "$WT" ]; }; then
-  emit unknown none "worktree gone (torn down?)"
-fi
-
 # --- status log ------------------------------------------------------------
 
 # Map a status-log verb onto a canonical state for the fallback path. `paused` is
@@ -278,6 +274,19 @@ map_log_state() {  # <line>
 
 LOG_LINE=$(status_current_line "$LOG" "$KIND")
 LOG_VERB=$(status_line_verb "$LOG_LINE")
+
+# A torn-down (or never-created) worktree has no live state to read, but a lane
+# whose recorded last status is an accepted done is finished, not unreadable:
+# the done gate accepts a recorded PR without the copy. A remote secondmate's
+# recorded worktree is a path on ITS host, so the local probe proves nothing
+# for it - the remote arm below reads the true source.
+if [ -z "$REMOTE_HOST" ] && { [ -z "$WT" ] || [ ! -d "$WT" ]; }; then
+  if [ "$LOG_VERB" = "done" ] \
+    && fm_dod_accept_ship_done "$KIND" "$(meta_value mode)" "$WT" "$(meta_value project)" "$LOG_LINE" "$STATE" "$ID" "$META" >/dev/null; then
+    emit "done" status-log "$(status_line_note "$LOG_LINE")${SEP}working copy released"
+  fi
+  emit unknown none "worktree gone (torn down?)"
+fi
 
 # --- remote secondmate: the true source is the remote endpoint ---------------
 # A remote mate's recorded worktree and backend target live on its own host, so
