@@ -1,0 +1,6 @@
+--- A: paused then failed (last log line paused)
+{"valid":false,"invalidity":{"kind":"terminal_in_flight","ids":["w"]},"reason":"in-flight backlog item has terminal child state: w=failed"}
+--- B: done, PR open, no merge marker (waiting on PR)
+{"valid":true,"invalidity":{"kind":null,"ids":[]},"reason":null}
+--- C: done, no PR
+{"valid":false,"invalidity":{"kind":"terminal_in_flight","ids":["w"]},"reason":"in-flight backlog item has terminal child state: w=done"}
