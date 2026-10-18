@@ -1,0 +1,21 @@
+=== base ===
+recpr              state: unknown · source: none · worktree gone (torn down?)
+recprok            state: unknown · source: none · worktree gone (torn down?)
+hand               state: unknown · source: none · worktree gone (torn down?)
+nomistakes_nopr    state: unknown · source: none · worktree gone (torn down?)
+working            state: unknown · source: none · worktree gone (torn down?)
+blocked            state: unknown · source: none · worktree gone (torn down?)
+nolog              state: unknown · source: none · worktree gone (torn down?)
+missing            state: unknown · source: none · no metadata for missing
+=== head ===
+recpr              state: unknown · source: none · worktree gone (torn down?)
+recprok            state: done · source: status-log · PR https://github.com/o/r/pull/8 · working copy released
+hand               state: unknown · source: none · worktree gone (torn down?)
+nomistakes_nopr    state: unknown · source: none · worktree gone (torn down?)
+working            state: unknown · source: none · worktree gone (torn down?)
+blocked            state: unknown · source: none · worktree gone (torn down?)
+nolog              state: unknown · source: none · worktree gone (torn down?)
+missing            state: unknown · source: none · no metadata for missing
+=== head: adversarial (scout done; receipt for a different PR number than recorded) ===
+sc         state: unknown · source: none · worktree gone (torn down?)
+recprok    state: unknown · source: none · worktree gone (torn down?)
