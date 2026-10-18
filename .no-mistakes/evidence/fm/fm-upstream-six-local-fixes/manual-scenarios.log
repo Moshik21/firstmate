@@ -1,0 +1,59 @@
+### scn_failed_send_no_notice
+rc=0
+--- stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+notice: domain has open captain call(s) in this home's ledger (captain-hold-call-a-1) and this send carries no --resolve-key, so it closes none of them; if it answers one, send the answer with --resolve-key <key> so the call closes without waiting for the mate's next turn.
+fm-send: doorbell not typed because the agent in sess:fm-domain has exited; the steer is durably recorded at /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.Eg8rDM/scn-fail-parent-8009/state/domain.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+--- inbox files:
+001.msg
+handled
+### scn_remote_answers_leg
+before:   state: queued
+answers: closed=0 skipped=0
+rc=0
+after:   state: queued
+0
+--- repeat (idempotence):
+answers: closed=0 skipped=0
+rc=0
+0
+--- unknown task:
+answers: closed=0 skipped=0
+rc=0
+--- wrong id:
+error: remote home belongs to domain, not other
+rc=1
+### scn_remote2
+before:
+  state: queued
+closed: call-r
+answers: closed=1 skipped=0
+rc=0
+after:
+  state: done
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 92d8a19e1be7abc298b4fe8be07801b2bfd80631ce1113af0e975f544cb7e294\nResolution mode: answered\n\nCaptain decision:\nCaptain answered this call through a firstmate answer relayed to domain by its parent.\nTask: call-r\nAnswer: remote ship it"
+--- repeat:
+closed: call-r
+answers: closed=1 skipped=0
+rc=0
+1
+--- unknown task:
+skipped: ghost (no captain-held task with that id)
+answers: closed=0 skipped=1
+rc=1
+--- empty lines:
+error: no keyed answer lines were supplied
+rc=1
+### scn_failed_send_real
+Terminated: 15
+### scn_failed_send_real2 (enqueue failure)
+rc=1
+--- stderr:
+mkdir: /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.TZoAqj/scn-fail3-parent-30223/state/domain.inbox/handled: Permission denied
+error: steer not sent to domain: its inbox record could not be written under /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.TZoAqj/scn-fail3-parent-30223/state/domain.inbox
