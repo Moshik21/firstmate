@@ -277,11 +277,13 @@ LOG_VERB=$(status_line_verb "$LOG_LINE")
 
 # A torn-down (or never-created) worktree has no live state to read, but a lane
 # whose recorded last status is an accepted done is finished, not unreadable:
-# the done gate accepts a recorded PR without the copy. A remote secondmate's
+# the done gate must evaluate it and accept a recorded PR without the copy.
+# An ungated done (a pipeline handoff) stays unknown. A remote secondmate's
 # recorded worktree is a path on ITS host, so the local probe proves nothing
 # for it - the remote arm below reads the true source.
 if [ -z "$REMOTE_HOST" ] && { [ -z "$WT" ] || [ ! -d "$WT" ]; }; then
   if [ "$LOG_VERB" = "done" ] \
+    && fm_dod_should_gate_ship_done "$KIND" "$(meta_value mode)" "$LOG_LINE" \
     && fm_dod_accept_ship_done "$KIND" "$(meta_value mode)" "$WT" "$(meta_value project)" "$LOG_LINE" "$STATE" "$ID" "$META" >/dev/null; then
     emit "done" status-log "$(status_line_note "$LOG_LINE")${SEP}working copy released"
   fi
