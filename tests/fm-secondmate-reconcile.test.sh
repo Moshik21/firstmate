@@ -261,6 +261,32 @@ test_a_mismatch_still_there_after_the_window_earns_one_more_nudge() {
   pass "a mismatch outliving the cooldown earns one re-nudge, then goes quiet again"
 }
 
+test_only_a_newly_flagged_id_restarts_the_window() {
+  local home mate fakebin snap out
+  { read -r home; read -r mate; read -r fakebin; } < <(make_main_home newid mate)
+  snap="$home/snapshot.json"
+  write_snapshot "$snap" mate '{"kind":"orphan_in_flight","ids":["a","b","c"]}'
+  run_notify "$home" "$fakebin" newid "$snap" >/dev/null || fail "the first ask failed"
+
+  # The mate repaired one row: progress on the same mismatch is not news.
+  write_snapshot "$snap" mate '{"kind":"orphan_in_flight","ids":["b","c"]}'
+  out=$(run_notify "$home" "$fakebin" newid "$snap") || fail "the shrunken-set run failed: $out"
+  assert_contains "$out" "cooldown: mate" "a shrinking id set re-nudged the mate: $out"
+  [ "$(inbox_records "$home/state" mate)" -eq 1 ] || fail "a shrinking id set was nudged again"
+
+  # An id the last nudge did not name is a new mismatch.
+  write_snapshot "$snap" mate '{"kind":"orphan_in_flight","ids":["b","d"]}'
+  out=$(run_notify "$home" "$fakebin" newid "$snap") || fail "the new-id run failed: $out"
+  assert_contains "$out" "sent: mate orphan_in_flight" "a newly flagged id was muted: $out"
+  [ "$(inbox_records "$home/state" mate)" -eq 2 ] || fail "a newly flagged id was not asked about"
+
+  # A record that does not name its ids (older digest-only) is unknown, so new.
+  printf '%s\n' 0123456789abcdef > "$home/state/mate.reconcile-nudged-ids"
+  out=$(run_notify "$home" "$fakebin" newid "$snap") || fail "the unknown-record run failed: $out"
+  assert_contains "$out" "sent: mate orphan_in_flight" "an unknown record muted the mismatch: $out"
+  pass "only a newly flagged id restarts the cooldown window"
+}
+
 test_the_cooldown_starts_when_delivery_finishes() {
   local home mate fakebin snap started nudged
   { read -r home; read -r mate; read -r fakebin; } < <(make_main_home deliverytime mate)
@@ -1004,6 +1030,7 @@ test_reconcile_requests_coalesce_per_target_until_delivery
 test_bearings_request_returns_before_remote_delivery_and_supervision_sends_later
 test_an_inventory_mismatch_asks_the_mate_once_per_window
 test_a_mismatch_still_there_after_the_window_earns_one_more_nudge
+test_only_a_newly_flagged_id_restarts_the_window
 test_the_cooldown_starts_when_delivery_finishes
 test_the_window_is_four_hours
 test_each_home_carries_its_own_cooldown

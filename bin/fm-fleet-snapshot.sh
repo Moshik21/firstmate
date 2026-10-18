@@ -253,9 +253,8 @@ aggregation, includes generated_epoch for freshness arithmetic, and marks
 inventory contradictions or unavailable child state invalid.
 kind=secondmate meta records are not child inventory for unowned_current or
 terminal_in_flight; they never have backlog rows.
-A done child still waiting on a recorded PR that no merge record covers, and a
-child whose newest record is a declared pause or open decision, are the normal
-shape of in-flight work and are not terminal_in_flight either.
+A done child still waiting on a recorded PR that no merge record covers is the
+normal shape of in-flight work and is not terminal_in_flight either.
 Its invalidity object names the normalized failure kind and affected ids.
 Actionable tasks-axi captain holds appear as decisions_open and stay visible in
 queued with hold_reason, hold_kind, hold_until,
@@ -1047,7 +1046,6 @@ secondmate_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
          | $tasks[]
          | select(.kind != "secondmate")
          | select(.id == $work.id and (.current_state.state == "done" or .current_state.state == "failed"))
-         | select(((.paths.status_log.last_event.state // "") | IN("paused","needs-decision")) | not)
          | select((.current_state.state == "done" and .pr.url != null and (.pr.merge_recorded != true)) | not)
          | {id,state:.current_state.state} ]) as $terminal_in_flight
     | ([if $backlog.present != true then

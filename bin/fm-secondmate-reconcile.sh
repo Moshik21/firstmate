@@ -41,11 +41,14 @@
 #     stale, cannot mis-order against a concurrent snapshot, and cannot
 #     mis-classify a repair as a new problem, which an identity-precise record
 #     has to get right in every direction to avoid silently swallowing a nudge.
-#     The one exception is a CHANGED mismatch: the sorted flagged ids and kind
-#     last nudged are kept beside the timestamp (<mate-id>.reconcile-nudged-ids,
-#     one digest line), and a snapshot whose id set differs restarts the window,
-#     so a new mismatch is never muted by an old nudge. A home with no such
-#     record (nudged before it existed) keeps the plain timestamp rule;
+#     The one exception is a NEW mismatch: the kind and flagged ids last nudged
+#     are kept beside the timestamp (<mate-id>.reconcile-nudged-ids, one
+#     <kind>:<sorted,ids> line), and a snapshot of a different kind, or one
+#     naming an id the last nudge did not, restarts the window, so a new
+#     mismatch is never muted by an old nudge. A set that only shrinks is
+#     progress, not news. A record without that shape (a digest-only line)
+#     counts as unknown and so as new; a home with no record at all (nudged
+#     before it existed) keeps the plain timestamp rule;
 #   - sending through bin/fm-send.sh's fire-and-forget plane, which records the
 #     instruction durably for local and remote mates alike while staying out of
 #     the steering inbox's re-ring and escalation ladder: the parent expects no
@@ -263,8 +266,8 @@ reconcile_text() {  # <kind> <csv-ids>
   printf 'Nothing outside your home has been changed, and no reply is expected.\n'
 }
 
-# <mate-id>.reconcile-nudged-ids holds one digest line of the kind and sorted ids
-# last nudged; see the cooldown paragraph in the header.
+# <mate-id>.reconcile-nudged-ids holds one <kind>:<sorted,ids> line for the nudge
+# last sent; see the cooldown paragraph in the header.
 nudge_ids_path() {  # <mate-id>
   printf '%s/%s.reconcile-nudged-ids\n' "$STATE" "$1"
 }
@@ -273,6 +276,16 @@ ids_fingerprint() {  # <kind> <csv-ids>
   local sorted
   sorted=$(printf '%s' "$2" | tr ',' '\n' | LC_ALL=C sort -u | tr '\n' ',')
   delivery_id "$1:$sorted"
+}
+
+mismatch_is_new() {  # <kind> <csv-ids> <record>
+  local rec=$3 id
+  case "$rec" in "$1":*) ;; *) return 0 ;; esac
+  rec=",${rec#*:},"
+  for id in $(printf '%s' "$2" | tr ',' ' '); do
+    case "$rec" in *",$id,"*) ;; *) return 0 ;; esac
+  done
+  return 1
 }
 
 request_target_key() {
@@ -517,7 +530,7 @@ cmd_notify() {
     | join($sep)')
 
   local id sampled_spawn_gen sampled_host expected_remote_host kind ids_csv path last age now delivered_at reconcile_lock control_lock meta meta_lock did send_rc
-  local fp ids_path last_fp
+  local fp ids_path last_rec
   while IFS=$'\037' read -r id sampled_spawn_gen sampled_host kind ids_csv; do
     [ -n "${id:-}" ] || continue
     path=$(nudge_path "$id")
@@ -533,15 +546,15 @@ cmd_notify() {
     case "$last" in ''|*[!0-9]*) last= ;; esac
     fp=$(ids_fingerprint "$kind" "$ids_csv") || fp=
     ids_path=$(nudge_ids_path "$id")
-    last_fp=
-    if [ -f "$ids_path" ] && [ ! -L "$ids_path" ]; then last_fp=$(cat "$ids_path" 2>/dev/null || true); fi
+    last_rec=
+    if [ -f "$ids_path" ] && [ ! -L "$ids_path" ]; then last_rec=$(cat "$ids_path" 2>/dev/null || true); fi
     if [ -n "$last" ]; then
       age=$((now - last))
       # A clock that moved backwards must not silence the home forever. A
-      # CHANGED mismatch (a different kind or id set than the one last nudged)
+      # NEW mismatch (a different kind, or an id the last nudge did not name)
       # restarts the window; a home with no recorded set keeps the timestamp rule.
       if [ "$age" -ge 0 ] && [ "$age" -lt "$FM_RECONCILE_COOLDOWN_SECONDS" ] \
-        && { [ -z "$last_fp" ] || [ -z "$fp" ] || [ "$last_fp" = "$fp" ]; }; then
+        && { [ -z "$last_rec" ] || ! mismatch_is_new "$kind" "$ids_csv" "$last_rec"; }; then
         printf 'cooldown: %s %s\n' "$id" "$age"
         release_active_locks
         continue
@@ -627,7 +640,7 @@ cmd_notify() {
       && mv -f -- "$path.tmp" "$path"; then
       # The set record is an optimization of the window, never of correctness:
       # when it cannot be written it is removed so the plain timestamp rule stands.
-      if [ -z "$fp" ] || ! { (umask 077; printf '%s\n' "$fp" > "$ids_path.tmp") \
+      if ! { (umask 077; printf '%s:%s\n' "$kind" "$ids_csv" > "$ids_path.tmp") \
         && mv -f -- "$ids_path.tmp" "$ids_path"; }; then
         rm -f -- "$ids_path.tmp" "$ids_path"
       fi
