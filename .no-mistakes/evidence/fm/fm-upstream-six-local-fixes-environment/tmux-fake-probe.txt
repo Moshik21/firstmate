@@ -1,0 +1,2 @@
+KEEP_ME=1
+args=new-session -d -s firstmate
