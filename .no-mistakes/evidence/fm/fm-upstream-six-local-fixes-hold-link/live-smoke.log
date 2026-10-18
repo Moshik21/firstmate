@@ -1,0 +1,28 @@
+== 1 valid link
+c1
+rc=0
+needs-decision [key=captain-hold-c1-1] [at=1792341219]: captain hold c1: board review pending - https://example.test/session/abc
+== 2 ftp
+fm-captain-hold: --link must be an http(s) URL: ftp://x/y
+rc=1
+== 3 multiline
+fm-captain-hold: link must be one line
+rc=1
+reason=1100 rc=0 
+reason=1150 rc=0 
+reason=1170 rc=1 fm-captain-hold: --link does not fit the parent line after the reason; shorten the reason
+reason=1180 rc=1 fm-captain-hold: --link does not fit the parent line after the reason; shorten the reason
+reason=1190 rc=1 fm-captain-hold: --link does not fit the parent line after the reason; shorten the reason
+reason=1200 rc=1 fm-captain-hold: --link does not fit the parent line after the reason; shorten the reason
+== channel lines ending with link
+3
+key=captain-hold-c1-1
+key=captain-hold-b1100-1
+key=captain-hold-b1150-1
+== held states
+error: "Task \"c2\" not found in this backlog"
+error: "Task \"c3\" not found in this backlog"
+error: "Task \"b1200\" not found in this backlog"
+== no link
+c4
+needs-decision [key=captain-hold-c4-1]: captain hold c4: plain
