@@ -929,6 +929,10 @@ command_hold() {
       https://*|http://*) : ;;
       *) fail "--link must be an http(s) URL: $link" ;;
     esac
+    case "$(fm_parent_channel_clean_note "$reason - $link")" in
+      *"$link") : ;;
+      *) fail "--link does not fit the parent line after the reason; shorten the reason" ;;
+    esac
   fi
   # bin/fm-hold-reason-lib.sh owns the storage constraint and reversible encoding.
   stored_reason=$(fm_hold_reason_encode "$reason") || fail "could not encode the hold reason"
