@@ -2254,7 +2254,7 @@ make_herdr_stub() {  # <case-dir>
   cat > "$fb/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-D=$FM_FAKE_DIR
+D=${0%/*}/../fake
 printf '%s\n' "$*" >> "$D/herdr-log"
 if [ "${1:-}" = status ] && [ "${2:-}" = --json ]; then
   if [ -f "$D/herdr-stopped" ]; then

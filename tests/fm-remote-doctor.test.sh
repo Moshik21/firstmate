@@ -171,7 +171,7 @@ semaphores = {
 properties = runatload | inferred program
 EOF
         if [ ! -f "$FM_FAKE_STATE/bootstrap-does-not-start" ]; then
-          printf 'true\n' > "$FM_FAKE_HERDR_RUNNING"
+          printf 'true\n' > "$HERDR_FAKE_RUNNING"
           printf '%s\n' "$FM_FAKE_AQUA_PID" > "$FM_FAKE_STATE/socket-owner"
         fi
         ;;
@@ -189,7 +189,7 @@ EOF
         if [ -f "$FM_FAKE_STATE/kickstart-delay" ]; then
           cp "$FM_FAKE_STATE/kickstart-delay" "$FM_FAKE_STATE/herdr-delay"
         else
-          printf 'true\n' > "$FM_FAKE_HERDR_RUNNING"
+          printf 'true\n' > "$HERDR_FAKE_RUNNING"
         fi
         ;;
     esac
@@ -246,7 +246,7 @@ SH
     cat > "$CASE_BIN/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-running=$(cat "$FM_FAKE_HERDR_RUNNING" 2>/dev/null || printf 'false')
+running=$(cat "$HERDR_FAKE_RUNNING" 2>/dev/null || printf 'false')
 case "${1:-} ${2:-}" in
   "status --json")
     if [ -f "$FM_FAKE_STATE/herdr-delay" ]; then
@@ -256,14 +256,14 @@ case "${1:-} ${2:-}" in
         running=false
       else
         rm -f "$FM_FAKE_STATE/herdr-delay"
-        printf 'true\n' > "$FM_FAKE_HERDR_RUNNING"
+        printf 'true\n' > "$HERDR_FAKE_RUNNING"
         running=true
       fi
     fi
     printf '{"client":{"version":"0.7.5","protocol":16},"server":{"running":%s,"socket":"%s"}}\n' "$running" "$FM_FAKE_HERDR_SOCKET"
     ;;
   "server "*|"server ")
-    printf 'true\n' > "$FM_FAKE_HERDR_RUNNING"
+    printf 'true\n' > "$HERDR_FAKE_RUNNING"
     ;;
 esac
 exit 0
@@ -305,7 +305,7 @@ doctor() {
     FM_FAKE_STATE="$CASE_STATE" \
     FM_FAKE_LAUNCHCTL_LOG="$CASE_LAUNCHCTL_LOG" \
     FM_FAKE_FORBIDDEN_LOG="$CASE_FORBIDDEN_LOG" \
-    FM_FAKE_HERDR_RUNNING="$CASE_HERDR_RUNNING" \
+    HERDR_FAKE_RUNNING="$CASE_HERDR_RUNNING" \
     FM_FAKE_HERDR_BIN="$CASE_BIN/herdr" \
     FM_FAKE_HERDR_SOCKET="$CASE_STATE/herdr.sock" \
     FM_FAKE_GUARD="$GUARD" \
