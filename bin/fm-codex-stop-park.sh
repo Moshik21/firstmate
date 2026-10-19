@@ -175,7 +175,8 @@ fi
 if [ "$MODE" = --guard ]; then
   if [ -n "$SESSION" ] && capable && [ ! -e "$STATE/.afk" ] \
     && fm_supervision_needed "$STATE"; then
-    for _ in 1 2 3 4 5 6 7 8 9 10; do
+    # Startup grace for the async hook to publish its claim: 50 x 0.2s, about 10s.
+    for _ in $(seq 50); do
       park_alive && exit 0
       # A queued wake owns the immediate handoff to the next model turn.
       if jq -e --arg session "$SESSION" --argjson now "$(date +%s)" \
