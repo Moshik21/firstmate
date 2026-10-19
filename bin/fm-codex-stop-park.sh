@@ -176,6 +176,9 @@ if [ "$MODE" = --guard ]; then
   if [ -n "$SESSION" ] && capable && [ ! -e "$STATE/.afk" ] \
     && fm_supervision_needed "$STATE"; then
     # Startup grace for the async hook to publish its claim: 50 x 0.2s, about 10s.
+    # That is 5x the earlier ~2s grace, under which retained native lab sessions
+    # recorded no fallback latch; an observation bound, not a measured
+    # hook-start to claim-publication latency.
     for _ in $(seq 50); do
       park_alive && exit 0
       # A queued wake owns the immediate handoff to the next model turn.
