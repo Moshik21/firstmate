@@ -931,6 +931,11 @@ A SIGKILL of the lab's identity-verified park removed its old arm/host/watcher s
 A healthy-park user message was processed without Escape or waiting for a checkpoint.
 Ordinary `/quit` also removed the park, host, arm and watcher: the watcher's owner-identity self-expiry covers native teardown that kills the hook and its timeout wrapper together.
 
+The synchronous guard waits up to fifty 0.2-second polls, about 10 seconds, for the asynchronous hook to publish its live claim before latching the session to foreground fallback.
+The retained successful native macOS arm64 Codex CLI 0.163.0 lab sessions recorded no fallback latch under the earlier grace of about 2 seconds (ten polls); 10 seconds is 5x that observation bound and the approved ceiling.
+This is derived from those no-latch observations, not from measured per-Stop minimum, median or maximum values or a cold-shell latency distribution.
+The retained native rollouts carry no paired hook-start and claim-publication timestamps, so no such measurement is claimed and the wait is not a strict wall-clock guarantee.
+
 The native mode is selected only for the verified CLI version and a registered TUI session owning this home's lock.
 Unverified sessions retain the foreground protocol, whose existing live guard remains `FM_CODEX_LIVE_E2E=1 tests/fm-codex-continuity-live-e2e.test.sh`.
 The native proof above was a real adapter smoke; it did not add a test case or modify the foreground live guard.
