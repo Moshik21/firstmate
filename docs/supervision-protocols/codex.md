@@ -3,7 +3,7 @@ Mode: Codex asynchronous Stop-hook-owned supervision.
 This mode is selected only for the native session registered by `bin/fm-codex-stop-park.sh` on a verified Codex CLI version.
 Other sessions retain [the foreground checkpoint protocol](codex-checkpoint.md) unchanged.
 
-When this session owns supervision and away mode is not active:
+When this session owns supervision:
 1. Drain first with `bin/fm-wake-drain.sh`.
    Handle every presented wake, open decision and unread status, then run the exact `WAKE_ACK_REQUIRED` acknowledgement command.
 2. End the turn when handling is complete.
