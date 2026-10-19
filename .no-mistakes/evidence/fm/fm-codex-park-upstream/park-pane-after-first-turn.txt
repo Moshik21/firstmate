@@ -1,0 +1,25 @@
+  >_ OpenAI Codex (v0.163.0)
+     /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.aGibR0/root
+  permissions: YOLO mode
+
+  Tip: Maximize usage with GPT-6.1 Sol. Try it on complex work for near-Astra performance at a lower cost.
+
+
+› Lab smoke test. Run bin/fm-wake-drain.sh once, then end your turn with the single word READY. Do not run any other
+  command and do not start a watcher.
+
+
+• Captain, I’ll run the wake drain once.
+
+• Ran bin/fm-wake-drain.sh
+  └ WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this
+    episode.
+
+• READY
+
+• Working (14s • esc to interrupt) · Running hook
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol low · /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.aGibR0/root · R…  ⚠ 1 warning · f2 to view
