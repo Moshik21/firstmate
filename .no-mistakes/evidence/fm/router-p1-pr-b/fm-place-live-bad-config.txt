@@ -1,0 +1,39 @@
+## 1 clear: two fitting local secondmates, main fallback
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+[exit 2]
+
+## 2 captain named
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+[exit 2]
+
+## 3 task already runs in candidate -> error
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+[exit 2]
+
+## 4 undeclared home -> exit 2
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+[exit 2]
+
+## 5 local-only never main
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+[exit 2]
+
+## 6 FM_PLACE=off
+place: off (FM_PLACE=off)
+[exit 0]
+
+## 7 outcome
+fm-place: outcome reason (not logged): because
+place-outcome: recorded t1 -> sm-a by firstmate (followed: no advice)
+[exit 0]
+
+## 8 review
+place-review:
+  span: 1 d   advice: 0   outcomes: 1
+  agreement: 0 of 0 followed
+  home: sm-a   advised 0   chosen 1   listed 0   unknown 0 (unreachable 0)
+[exit 0]
+
+## log
+-rw-------@ 1 konnermoshier  staff  139 Oct 20 14:00 /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.6CwKCl/state/lane-placement.jsonl
+       1 /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.6CwKCl/state/lane-placement.jsonl

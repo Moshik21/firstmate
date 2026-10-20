@@ -1,0 +1,45 @@
+### S8 outcome followed / override + pending
+place-outcome: recorded t2 -> scholar by firstmate (followed: yes)
+exit=0
+fm-place: outcome reason (not logged): secret-reason-text
+place-outcome: recorded t3 -> scholar by captain (followed: no)
+exit=0
+### S9 pending lane holds a place: scholar cap 2, two pending -> full?
+place-outcome: recorded t90 -> scholar by firstmate (followed: no advice)
+place-outcome: recorded t91 -> scholar by firstmate (followed: no advice)
+place:
+  status: full   mode: advise   task: t10   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: scholar -> not eligible: full: 0+4 pending of 2 lanes
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1792530528-t10
+exit=0
+### S10 review
+place-review:
+  span: 1 d   advice: 6   outcomes: 4
+  status: clear 3, ambiguous 1, captain 1, full 1
+  agreement: 1 of 2 followed (50%)
+  override: t3 advised main chose scholar by captain
+  home: main   advised 2   chosen 0   listed 5   unknown 0 (unreachable 0)   refused: pressure warn 1
+  home: scholar   advised 2   chosen 4   listed 6   unknown 1 (unreachable 0)   refused: full 1, local-only work stays in the main home 1
+### log mode / reason not logged
+-rw-------@ 1 konnermoshier  staff  5642 Oct 20 14:08 /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.lyjOeK/state/lane-placement.jsonl
+0
+### S11 stale facts: age the clock 10 min
+place:
+  status: ambiguous   mode: advise   task: t11   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: scholar -> unknown: facts 618 s old (home not publishing)
+  candidate: main (fallback) -> unknown: facts 619 s old (home not publishing)
+  reason: no home is rankable on known facts (scholar: facts 618 s old (home not publishing); main: facts 619 s old (home not publishing)); decide as today
+  log: 1792531128-t11
+exit=0
+### S12 foreign: tamper facts home field
+place:
+  status: clear   mode: advise   task: t12   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: scholar -> unknown: facts name home evil, not scholar
+  candidate: main -> eligible score 51: mem 25/40 cpu 21/25 room 20/20 captain -15  [lanes 0/8, 8 GB free, runq 0.4/core, facts 19 s]
+  place: main
+  log: 1792530528-t12
+exit=0
+### S13 enforce mode is config error
+fm-place: config/lane-placement.json: mode enforce is not available in this version; use advise or off
+exit=2

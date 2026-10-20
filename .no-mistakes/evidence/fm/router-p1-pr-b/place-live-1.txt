@@ -1,0 +1,8 @@
+$ fm-place ... --fitting scholar --fallback main   (host really under warn pressure)
+place:
+  status: ambiguous   mode: advise   task: t1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: scholar -> unknown: facts name home main, not scholar
+  candidate: main (fallback) -> not eligible: pressure warn: load 18.37 on 8 cores
+  reason: no home is rankable on known facts (scholar: facts name home main, not scholar); every other home is refused; decide as today
+  log: 1792530491-t1
+exit=0

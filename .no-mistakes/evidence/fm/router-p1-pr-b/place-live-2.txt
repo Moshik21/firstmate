@@ -1,0 +1,40 @@
+### S2 clear: both homes healthy, scholar better
+place:
+  status: clear   mode: advise   task: t2   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: scholar -> eligible score 70: mem 27/40 cpu 23/25 room 20/20  [lanes 0/2, 14 GB free, runq 0.2/core, facts 6 s]
+  candidate: main (fallback) -> eligible score 51: mem 25/40 cpu 21/25 room 20/20 captain -15  [lanes 0/8, 8 GB free, runq 0.4/core, facts 7 s]
+  place: scholar
+  log: 1792530516-t2
+exit=0
+
+### S3 captain choice: main named
+place:
+  status: captain   mode: advise   task: t3   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: scholar -> eligible score 70: mem 27/40 cpu 23/25 room 20/20  [lanes 0/2, 14 GB free, runq 0.2/core, facts 7 s]
+  candidate: main (captain) -> eligible score 51: mem 25/40 cpu 21/25 room 20/20 captain -15  [lanes 0/8, 8 GB free, runq 0.4/core, facts 8 s]
+  reason: the captain named this home
+  place: main
+  log: 1792530517-t3
+exit=0
+
+### S4 local-only never main? (local-only, fitting main)
+place:
+  status: clear   mode: advise   task: t4   project: demo (local-only)   profile: default 1 GB
+  candidate: main -> eligible score 51: mem 25/40 cpu 21/25 room 20/20 captain -15  [lanes 0/8, 8 GB free, runq 0.4/core, facts 8 s]
+  candidate: scholar -> not eligible: local-only work stays in the main home
+  place: main
+  log: 1792530517-t4
+exit=0
+
+### S5 unknown home / unknown delivery -> exit 2
+fm-place: unknown home 'nosuch': not main and not one registered secondmate in data/secondmates.md
+exit=2
+fm-place: --delivery must be no-mistakes, direct-PR, or local-only
+exit=2
+
+### S6 json
+{"event":"place.advice","status":"clear","chosen":"scholar","cands":[{"home":"scholar","class":"eligible","score":70},{"home":"main","class":"eligible","score":51}]}
+
+### S7 kill switch
+place: off (FM_PLACE=off)
+exit=0

@@ -1,0 +1,147 @@
+## A tie on score -> lower rank (sm-a) wins
+place:
+  status: clear   mode: advise   task: a1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> eligible score 75: mem 31/40 cpu 24/25 room 20/20  [lanes 0/4, 9.28 GB free, runq 0.12/core, facts 2 s]
+  candidate: sm-b -> eligible score 75: mem 31/40 cpu 24/25 room 20/20  [lanes 0/1, 9.28 GB free, runq 0.12/core, facts 1 s]
+  candidate: main (fallback) -> eligible score 61: mem 32/40 cpu 24/25 room 20/20 captain -15  [lanes 0/4, 9.44 GB free, runq 0.12/core, facts 4 s]
+  note: tie at 75 broken by the fixed rank in config/lane-placement (sm-a rank 1, sm-b rank 2)
+  place: sm-a
+  log: 1792530072-a1
+[exit 0]
+
+## B sm-a has 3 of 4 lanes -> sm-b wins on room
+place:
+  status: clear   mode: advise   task: b1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> eligible score 62: mem 33/40 cpu 24/25 room 5/20  [lanes 3/4, 9.6 GB free, runq 0.12/core, facts 3 s]
+  candidate: sm-b -> eligible score 77: mem 33/40 cpu 24/25 room 20/20  [lanes 0/1, 9.6 GB free, runq 0.12/core, facts 1 s]
+  candidate: main (fallback) -> eligible score 59: mem 30/40 cpu 24/25 room 20/20 captain -15  [lanes 0/4, 9.12 GB free, runq 0.12/core, facts 7 s]
+  place: sm-b
+  log: 1792530080-b1
+[exit 0]
+
+## C both fitting full (sm-b 1/1, sm-a 4/4) -> fallback main
+place:
+  status: clear   mode: advise   task: c1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> not eligible: full: 4 of 4 lanes
+  candidate: sm-b -> not eligible: full: 1 of 1 lanes
+  candidate: main (fallback) -> eligible score 61: mem 32/40 cpu 24/25 room 20/20 captain -15  [lanes 0/4, 9.44 GB free, runq 0.12/core, facts 1 s]
+  note: every fitting home is blocked (sm-a: full: 4 of 4 lanes; sm-b: full: 1 of 1 lanes); main is the fallback
+  place: main
+  log: 1792530084-c1
+[exit 0]
+
+## D everything full incl main -> full / keep queued
+place:
+  status: full   mode: advise   task: d1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> not eligible: full: 4 of 4 lanes
+  candidate: sm-b -> not eligible: full: 1 of 1 lanes
+  candidate: main (fallback) -> not eligible: full: 4 of 4 lanes
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1792530088-d1
+[exit 0]
+
+## E task already runs in candidate -> error (decide as today)
+place:
+  status: error   mode: advise   task: e1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> error: task e1 already runs here: placement is for new lanes only
+  candidate: sm-b -> eligible score 75: mem 31/40 cpu 24/25 room 20/20  [lanes 0/1, 9.28 GB free, runq 0.12/core, facts 0 s]
+  candidate: main (fallback) -> eligible score 60: mem 31/40 cpu 24/25 room 20/20 captain -15  [lanes 0/4, 9.28 GB free, runq 0.12/core, facts 1 s]
+  reason: task e1 already runs here: placement is for new lanes only
+  log: 1792530090-e1
+[exit 0]
+
+## F stale facts on sm-a -> unknown, sm-b chosen
+place:
+  status: clear   mode: advise   task: f1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> unknown: facts 3602 s old (home not publishing)
+  candidate: sm-b -> eligible score 74: mem 30/40 cpu 24/25 room 20/20  [lanes 0/1, 9.12 GB free, runq 0.12/core, facts 1 s]
+  candidate: main (fallback) -> eligible score 59: mem 30/40 cpu 24/25 room 20/20 captain -15  [lanes 0/4, 9.12 GB free, runq 0.12/core, facts 2 s]
+  place: sm-b
+  log: 1792530093-f1
+[exit 0]
+
+## G future-dated facts on sm-a (+1h) -> unknown
+place:
+  status: clear   mode: advise   task: g1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> unknown: facts dated 3598 s in the future: clock skew
+  candidate: sm-b -> eligible score 77: mem 33/40 cpu 24/25 room 20/20  [lanes 0/1, 9.6 GB free, runq 0.12/core, facts 1 s]
+  candidate: main (fallback) -> eligible score 62: mem 33/40 cpu 24/25 room 20/20 captain -15  [lanes 0/4, 9.6 GB free, runq 0.12/core, facts 2 s]
+  place: sm-b
+  log: 1792530096-g1
+[exit 0]
+
+## H missing facts on sm-b -> unknown
+place:
+  status: clear   mode: advise   task: h1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> eligible score 75: mem 31/40 cpu 24/25 room 20/20  [lanes 0/4, 9.28 GB free, runq 0.12/core, facts 1 s]
+  candidate: sm-b -> unknown: no published facts
+  candidate: main (fallback) -> eligible score 61: mem 32/40 cpu 24/25 room 20/20 captain -15  [lanes 0/4, 9.44 GB free, runq 0.12/core, facts 3 s]
+  place: sm-a
+  log: 1792530100-h1
+[exit 0]
+
+## I captain names sm-b even though sm-a scores better; advice never moves anything
+place:
+  status: captain   mode: advise   task: i1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> eligible score 74: mem 30/40 cpu 24/25 room 20/20  [lanes 0/4, 9.12 GB free, runq 0.12/core, facts 0 s]
+  candidate: sm-b -> eligible score 74: mem 30/40 cpu 24/25 room 20/20  [lanes 0/1, 9.12 GB free, runq 0.12/core, facts 0 s]
+  candidate: main (fallback) -> eligible score 59: mem 30/40 cpu 24/25 room 20/20 captain -15  [lanes 0/4, 9.12 GB free, runq 0.12/core, facts 1 s]
+  reason: the captain named this home
+  place: sm-b
+  log: 1792530101-i1
+[exit 0]
+
+## J heavy load on sm-a -> refused (pressure warn), sm-b chosen
+place:
+  status: clear   mode: advise   task: j1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: sm-a -> not eligible: pressure warn: load 20.0 on 8 cores
+  candidate: sm-b -> eligible score 73: mem 29/40 cpu 24/25 room 20/20  [lanes 0/1, 8.96 GB free, runq 0.12/core, facts 2 s]
+  candidate: main (fallback) -> eligible score 59: mem 30/40 cpu 24/25 room 20/20 captain -15  [lanes 0/4, 9.12 GB free, runq 0.12/core, facts 4 s]
+  place: sm-b
+  log: 1792530106-j1
+[exit 0]
+
+## K outcome follows advice, then override
+place-outcome: recorded k1 -> sm-a by firstmate (followed: yes)
+[exit 0]
+fm-place: outcome reason (not logged): secret-text
+place-outcome: recorded k2 -> sm-b by captain (followed: yes)
+[exit 0]
+
+## L review
+place-review:
+  span: 1 d   advice: 12   outcomes: 2
+  status: clear 9, captain 1, error 1, full 1
+  agreement: 2 of 2 followed (100%)
+  home: main   advised 1   chosen 0   listed 12   unknown 0 (unreachable 0)   refused: full 1
+  home: sm-a   advised 3   chosen 1   listed 12   unknown 2 (unreachable 0)   refused: full 2, pressure warn 1
+  home: sm-b   advised 6   chosen 1   listed 12   unknown 1 (unreachable 0)   refused: full 2
+[exit 0]
+
+## M json log: mode, lines, secret-text absent
+600
+      14
+0
+{"v":1,"ts":1792530115,"event":"place.outcome","id":"1792530115-k1","task":"k1","home":"sm-a","by":"firstmate","followed":true,"outcome":"followed"}
+{"v":1,"ts":1792530116,"event":"place.outcome","id":"1792530116-k2","task":"k2","home":"sm-b","by":"captain","followed":true,"outcome":"followed"}
+
+## N mode enforce -> config error exit 2; mode off -> silent
+fm-place: config/lane-placement.json: mode enforce is not available in this version; use advise or off
+[exit 2]
+place: off (mode off in config/lane-placement.json)
+[exit 0]
+
+## O no config -> off
+place: off (config/lane-placement.json absent)
+[exit 0]
+
+## P nothing spawned/moved: lab tree changes limited to log
+/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.6CwKCl/sm-a/state:
+lane-capacity.json
+
+/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.6CwKCl/sm-b/state:
+lane-capacity.json
+
+/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.6CwKCl/state:
+lane-capacity.json
+lane-placement.jsonl
