@@ -1,0 +1,2 @@
+ok - a reconciliation-required needs-decision row's queued payload is still marked needs-decision:
+bash tests/.tmp-nd.test.sh  1.30s user 2.51s system 38% cpu 9.959 total
