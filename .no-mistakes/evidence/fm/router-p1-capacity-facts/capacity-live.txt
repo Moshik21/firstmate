@@ -1,0 +1,45 @@
+## 1. no config => no target
+capacity: free_lanes=unknown reason=no-target lanes=0 target=none secondmates=0 load1=105.68 cores=8 mem_free_pct=51 disk_free_mb=111048
+Lanes: 0 running, no target set (config/lane-capacity absent).
+Host: load 105.68 on 8 cores, memory free 51%, disk free 111048 MB.
+Constrained: cpu - hold new dispatch until it clears.
+rc=0
+## 2. cap 3, 2 lanes + 1 secondmate
+capacity: free_lanes=0 reason=cpu lanes=2 target=3 secondmates=1 load1=105.68 cores=8 mem_free_pct=51 disk_free_mb=111048
+Lanes: 2 running of 3 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 105.68 on 8 cores, memory free 51%, disk free 111048 MB.
+Constrained: cpu - hold new dispatch until it clears.
+rc=0
+## 3. --json
+{"schema":"fm-lane-capacity.v1","lanes":{"count":2,"pr_ready":0,"ids":["a","b"]},"cap":{"target":3,"status":"ok"}}
+## 4. --publish
+rc=0
+-rw-------@ 1 konnermoshier  staff  1111 Oct 20 11:49 /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.Y2Kqq0/state/lane-capacity.json
+"fm-lane-capacity.v1"
+## 5. --admit
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.Y2Kqq0/config/lane-capacity) does not admit another lane: cpu: load 105.68 on 8 cores; the lane was not launched and its backlog item stays queued
+rc=75
+## 6. full (3 lanes)
+capacity: free_lanes=0 reason=cpu lanes=3 target=3 secondmates=1 load1=105.68 cores=8 mem_free_pct=52 disk_free_mb=111048
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.Y2Kqq0/config/lane-capacity) does not admit another lane: cpu: load 105.68 on 8 cores; the lane was not launched and its backlog item stays queued
+admit_rc=75
+## 7. malformed
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=105.68 cores=8 mem_free_pct=52 disk_free_mb=111048
+Lanes: 3 running, target unreadable (config/lane-capacity: line 1: the first line must be the lane cap, one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 105.68 on 8 cores, memory free 52%, disk free 111048 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity: line 1: the first line must be the lane cap, one non-negative integer
+rc=1
+## 8. reserve flag
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=105.68 cores=8 mem_free_pct=52 disk_free_mb=111048
+fm-capacity: config/lane-capacity: line 2: unknown key 'reserve-flag=/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.Y2Kqq0/hold'
+## 8. reserve key + max-load1
+fm-capacity: config/lane-capacity: line 2: unknown key 'reserve'
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=102.26 cores=8 mem_free_pct=51 disk_free_mb=111051
+## 8. reserve-flag present/absent
+capacity: free_lanes=0 reason=cpu,reserve lanes=3 target=5 secondmates=1 load1=96.47 cores=8 mem_free_pct=49 disk_free_mb=111049
+["load 96.47 on 8 cores"]
+{"target":5,"status":"ok"}
+capacity: free_lanes=0 reason=cpu lanes=3 target=5 secondmates=1 load1=96.47 cores=8 mem_free_pct=48 disk_free_mb=111049

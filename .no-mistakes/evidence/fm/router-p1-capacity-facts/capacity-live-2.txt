@@ -1,0 +1,13 @@
+### 6b secret leakage with a valid beat + reserve flag
+fm-capacity: pressure: token=SECRET123 /Users/x/secret
+fm-capacity: pressure: beat errors: boom SECRET123 /dev/x
+fm-capacity: reason: pressure warn: token=SECRET123 /Users/x/secret
+fm-capacity: reason: captain reserve: tower-label
+rc=0
+"beat-host"
+{"level":"warn","why":["pressure_why=1","beat_errors=1"],"basis":"beat","beat_age_s":0,"avail_gb":9,"total_gb":16,"runq_per_core":0.2,"swap_rate_pps_1m":0,"mem_stall_pct":null,"load1":null,"on_battery":false,"disks":[]}
+{"flag":"present","label":"tower-label"}
+{"admit":false,"free_lanes":0,"reasons":["pressure warn","captain reserve: tower-label"]}
+SECRET123 occurrences: 0; lab path occurrences: 0; /dev/x: 0
+### 7 real watcher publishes only when opted in
+published after 5s: ["fm-lane-capacity.v1","ok"]
