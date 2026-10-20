@@ -1,0 +1,26 @@
+### 1. both fitting, advice
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+exit=2
+### 2. requires macos -> docs-lanes not eligible
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+exit=2
+### 3. captain override
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+exit=2
+### 4. unknown home (adversarial)
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+exit=2
+### 5. stale/missing facts -> unknown
+fm-place: config/lane-placement.json: facts_max_age_s, facts_budget_s, min_uptime_s, unstable_window_s, and pending_ttl_s must be positive integers
+exit=2
+### 6. off via FM_PLACE=off
+place: off (FM_PLACE=off)
+exit=0
+### 7. outcome + review
+place-outcome: recorded t1 -> main by firstmate (followed: no advice)
+exit=0
+{"since_days":14,"advice":0,"outcomes":1,"status":{},"agreement":{"judged":0,"followed":0},"overrides":[],"homes":[{"home":"main","advised":0,"chosen":1,"listed":0,"unknown":0,"unreachable":0,"refused":{}}]}
+
+### 8. log perms
+600
+       1 /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.vF6ZBn/state/lane-placement.jsonl

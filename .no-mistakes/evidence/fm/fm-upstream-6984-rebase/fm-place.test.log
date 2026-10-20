@@ -1,0 +1,10 @@
+ok - the Proposal's worked examples recompute to the same placements
+ok - off, FM_PLACE=off, and an absent config print one stderr line and read nothing
+ok - usage and configuration errors exit 2 and are never selected around
+ok - every filter refuses, discloses, or ranks with its plain reason
+fm-place: outcome reason (not logged): the captain wants it on scholar
+ok - outcomes record the choice, and recent ones hold pending lanes
+ok - unreachable and stalled homes are unknown, and the log is private, rotated, and optional
+fm-place: outcome reason (not logged): kept with its sibling lane
+ok - review reports agreement, overrides, and per-home refusals over its span
+# all fm-place tests passed

@@ -1,0 +1,45 @@
+### 1. both fitting, advice
+place:
+  status: full   mode: advise   task: t1   project: demo (local-only)   profile: default 0.5 GB
+  candidate: main -> not eligible: no demo clone in this home; pressure warn: load 112.89 on 8 cores
+  candidate: docs-lanes -> not eligible: local-only work stays in the main home
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1792524019-t1
+exit=0
+### 2. requires macos -> docs-lanes not eligible
+place:
+  status: full   mode: advise   task: t2   project: demo (local-only)   profile: macos-app 0.5 GB
+  candidate: main -> not eligible: no demo clone in this home; pressure warn: load 112.89 on 8 cores
+  candidate: docs-lanes -> not eligible: local-only work stays in the main home
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1792524021-t2
+exit=0
+### 3. captain override
+place:
+  status: captain   mode: advise   task: t3   project: demo (local-only)   profile: default 0.5 GB
+  candidate: main -> not eligible: no demo clone in this home; pressure warn: load 112.89 on 8 cores
+  candidate: docs-lanes (captain) -> not eligible: local-only work stays in the main home
+  reason: the captain named this home
+  note: facts for the captain's choice, for the record only: local-only work stays in the main home
+  place: docs-lanes
+  log: 1792524023-t3
+exit=0
+### 4. unknown home
+fm-place: unknown home 'nope': not main and not one registered secondmate in data/secondmates.md
+exit=2
+### 5. missing facts -> unknown
+place:
+  status: full   mode: advise   task: t5   project: demo (local-only)   profile: default 0.5 GB
+  candidate: main -> not eligible: no demo clone in this home; pressure warn: load 112.89 on 8 cores
+  candidate: docs-lanes -> not eligible: local-only work stays in the main home
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1792524025-t5
+exit=0
+### 6. outcome + review
+place-outcome: recorded t1 -> main by firstmate (followed: no advice)
+exit=0
+{"since_days":14,"advice":4,"outcomes":1,"status":{"full":3,"captain":1},"agreement":{"judged":0,"followed":0},"overrides":[],"homes":[{"home":"docs-lanes","advised":1,"chosen":0,"listed":4,"unknown":0,"unreachable":0,"refused":{"local-only work stays in the main home":4}},{"home":"main","advised":0,"chosen":1,"listed":4,"unknown":0,"unreachable":0,"refused":{"no demo clone in this home":4,"pressure warn":4}}]}
+
+### 7. log
+600
+       5

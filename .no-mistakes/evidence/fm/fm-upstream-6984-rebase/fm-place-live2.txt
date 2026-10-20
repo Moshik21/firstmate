@@ -1,0 +1,26 @@
+### A both fitting, direct-PR
+place:
+  status: ambiguous   mode: advise   task: a1   project: demo (direct-PR)   profile: default 0.5 GB
+  candidate: main -> not eligible: pressure warn: load 121.85 on 8 cores
+  candidate: docs-lanes -> unknown: facts name home main, not docs-lanes
+  reason: no home is rankable on known facts (docs-lanes: facts name home main, not docs-lanes); every other home is refused; decide as today
+  log: 1792524045-a1
+exit=0
+### B requires macos
+place:
+  status: ambiguous   mode: advise   task: a2   project: demo (direct-PR)   profile: default 0.5 GB
+  candidate: main -> not eligible: pressure warn: load 121.85 on 8 cores
+  candidate: docs-lanes -> unknown: facts name home main, not docs-lanes
+  reason: no home is rankable on known facts (docs-lanes: facts name home main, not docs-lanes); every other home is refused; decide as today
+  log: 1792524046-a2
+exit=0
+### C docs-lanes facts missing -> unknown, main still ranked
+place:
+  status: ambiguous   mode: advise   task: a3   project: demo (direct-PR)   profile: default 0.5 GB
+  candidate: main -> not eligible: pressure warn: load 121.85 on 8 cores
+  candidate: docs-lanes -> unknown: no published facts
+  reason: no home is rankable on known facts (docs-lanes: no published facts); every other home is refused; decide as today
+  log: 1792524047-a3
+exit=0
+### D task already running in candidate -> error
+{"v":1,"ts":1792524049,"event":"place.advice","id":"1792524049-a3","mode":"advise","task":"a3","project":"demo","delivery":"direct-PR","profile":"default","footprint_gb":0.5,"requires":[],"fitting":["main"],"fallback":[],"captain_named":null,"facts_ms":0,"status":"full","reason":"every in-scope home
