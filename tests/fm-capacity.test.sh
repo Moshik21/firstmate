@@ -480,7 +480,8 @@ SH
   assert_no_grep 900000 "$TMP_ROOT/captain-doc.json" "raw idle time must never be published"
   assert_no_grep HIDIdleTime "$TMP_ROOT/captain-doc.json" "raw idle input must never be published"
   printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/quota-axi"
-  rm -f "$home/state/.afk-contract" "$fakebin/ioreg"
+  rm -f "$home/state/.afk-contract"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/ioreg"
   doc=$(capacity_doc "$home" "$fakebin")
   assert_equals 'unknown|unknown' "$(printf '%s\n' "$doc" | jq -r '"\(.captain)|\(.quota.runway)"')" \
     "unreadable presence and quota must read unknown"
