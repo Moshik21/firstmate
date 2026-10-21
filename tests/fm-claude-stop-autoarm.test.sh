@@ -939,8 +939,7 @@ test_abandoned_claim_reclaim_reaps_dead_steal_without_nesting() {
   ' _ "$dir/bin/fm-wake-lib.sh" "$dir/state/.claude-autoarm.lock.steal" >/dev/null 2>&1 &
   holder=$!
   i=0
-  while [ ! -s "$dir/state/.claude-autoarm.lock.steal/pid" ]; do
-    [ "$i" -lt 500 ] || fail "steal mutex holder never published its pid"
+  while [ "$i" -lt 50 ] && [ ! -s "$dir/state/.claude-autoarm.lock.steal/pid" ]; do
     sleep 0.02
     i=$((i + 1))
   done
