@@ -178,7 +178,7 @@ write_beat() {
   local why_json='[]'
   [ -z "$why" ] || why_json="[\"$why\"]"
   cat > "$1" <<JSON
-{"schema":"lookout.beat","schema_version":"1.0","host":"beat-host","os":"wsl","interval_s":15,
+{"schema":"lookout.beat","schema_version":"1.0","host":"beat-host","os":"linux","interval_s":15,
  "machine":{"id":"beat-host","status":"$2","load":{"l1":$6,"runq_per_core":$5},
   "mem":{"avail_gb":$3,"total_gb":$4,"swap_rate_pps_1m":0.5,"psi_some10":1.25},
   "disks":[{"label":"disk","free_gb":$disk}],"uptime_s":5000,"on_battery":$7,
@@ -209,7 +209,7 @@ min-avail-gb 2.5
 min-disk-gb 3
 pressure-file $home/beat-a.json
 pressure-file $home/beat-b.json
-reserve-flag $home/reserved.flag tower reserved by the captain
+reserve-flag $home/reserved.flag host reserved by the captain
 captain-idle 300
 max-load1 20
 CFG
@@ -377,7 +377,7 @@ min-avail-gb 5
 min-disk-gb 60
 max-load1 20
 pressure-file $home/beat.json
-reserve-flag $home/reserved.flag tower reserved by the captain
+reserve-flag $home/reserved.flag host reserved by the captain
 CFG
   : > "$home/reserved.flag"
   out=$(run_capacity_jq "$home" "$fakebin")
@@ -385,7 +385,7 @@ CFG
   out=$(run_capacity_jq "$home" "$fakebin" --admit); rc=$?
   expect_code 75 "$rc" "admit under limits"
   assert_contains "$out" 'deferred: lane capacity of this home' "a deferral must print one deferred line"
-  assert_contains "$out" 'memory: no room for a 1 GB lane: 5.5 GB available, 5 GB kept; disk: disk 50 GB free, under 60 GB; load: 24.7 over its max-load1 20; captain reserve: tower reserved by the captain; on battery' \
+  assert_contains "$out" 'memory: no room for a 1 GB lane: 5.5 GB available, 5 GB kept; disk: disk 50 GB free, under 60 GB; load: 24.7 over its max-load1 20; captain reserve: host reserved by the captain; on battery' \
     "the deferral must give every reason in words"
   write_beat "$home/beat.json" ok 13.5 25.2 0.29 2.0 false "" 500
   rm -f "$home/reserved.flag"
@@ -444,11 +444,11 @@ test_publish_document() {
   expect_code 0 "$rc" "publish with invalid config"
   assert_equals 'invalid|null|false' "$(jq -r '"\(.cap.status)|\(.cap.target)|\(.verdict.admit)"' "$home/state/lane-capacity.json")" \
     "an invalid config must be published as invalid"
-  printf '6\n/mnt/c/fm-tower-reserved.flag tower\n' > "$home/config/lane-capacity"
+  printf '6\n/var/run/fm-reserved.flag host\n' > "$home/config/lane-capacity"
   FM_LANE_CAPACITY_PUBLISH_INTERVAL=0 run_capacity_jq "$home" "$fakebin" --publish >/dev/null
   assert_equals 'config/lane-capacity: line 2: unknown key' "$(jq -r '.verdict.reasons | join(",")' "$home/state/lane-capacity.json")" \
     "an invalid config line must be published by its line and a fixed reason"
-  assert_no_grep fm-tower "$home/state/lane-capacity.json" "a config line's raw text must never be published"
+  assert_no_grep fm-reserved "$home/state/lane-capacity.json" "a config line's raw text must never be published"
   pass "publish is opt-in, private, throttled, records boots, and publishes an invalid config as invalid"
 }
 

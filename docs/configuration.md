@@ -677,7 +677,7 @@ Optional lines follow, one key and its value per line, with `#` starting a comme
 min-avail-gb 5         # keep this much memory available; a 1 GB lane must fit above it
 min-disk-gb 60         # every disk row must stay above this many GB
 pressure-file ~/.cache/lookout-beat/beat.json      # repeatable; a lookout.beat 1.x document
-reserve-flag /mnt/c/fm-tower-reserved.flag tower reserved by the captain   # repeatable; admit nothing while the file exists
+reserve-flag /var/run/fm-reserved.flag host reserved by the captain   # repeatable; admit nothing while the file exists
 captain-idle 300       # opt-in, macOS: the captain counts as present when input was idle under 300 s
 quota-provider claude  # opt-in: publish that provider's quota runway
 max-load1 20           # keep a raw 1-minute load rule while beats replace it
