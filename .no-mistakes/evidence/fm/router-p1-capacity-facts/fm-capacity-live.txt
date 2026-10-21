@@ -1,0 +1,77 @@
+## S1 no config
+capacity: free_lanes=unknown reason=no-target lanes=0 target=none secondmates=0 load1=17.44 cores=8 mem_free_pct=58 disk_free_mb=97845
+Lanes: 0 running, no target set (config/lane-capacity absent).
+Host: load 17.44 on 8 cores, memory free 58%, disk free 97845 MB.
+exit=0
+exit=0
+exit=0
+## S2 cap 2, 1 lane + 1 secondmate
+capacity: free_lanes=0 reason=cpu lanes=1 target=2 secondmates=1 load1=17.44 cores=8 mem_free_pct=58 disk_free_mb=97844
+Lanes: 1 running of 2 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 17.44 on 8 cores, memory free 58%, disk free 97844 MB.
+Constrained: cpu - hold new dispatch until it clears.
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.8nmevV/config/lane-capacity) does not admit another lane: cpu: load 17.44 on 8 cores
+exit=75
+## S3 full
+capacity: free_lanes=0 reason=cpu lanes=2 target=2 secondmates=1 load1=17.44 cores=8 mem_free_pct=58 disk_free_mb=97844
+Lanes: 2 running of 2 target, 0 open.
+Secondmates: 1 (hold no lane).
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.8nmevV/config/lane-capacity) does not admit another lane: cpu: load 17.44 on 8 cores
+exit=75
+## S4 publish + json
+exit=0
+-rw-------@ 1 konnermoshier  staff  1106 Oct 20 22:15 /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.8nmevV/state/lane-capacity.json
+{
+  "schema": "fm-lane-capacity.v1",
+  "home": "main",
+  "lanes": {
+    "count": 2,
+    "pr_ready": 1,
+    "ids": [
+      "a",
+      "b"
+    ]
+  },
+  "cap": {
+    "target": 2,
+    "status": "ok"
+  },
+  "verdict": {
+    "admit": false,
+    "free_lanes": 0,
+    "reasons": [
+      "cpu: load 17.44 on 8 cores"
+    ]
+  },
+  "reserve": {
+    "flag": "not-configured",
+    "label": null
+  },
+  "limits": {
+    "min_avail_gb": null,
+    "min_disk_gb": null,
+    "max_load1": null
+  }
+}
+## S5 reserve flag
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.8nmevV/config/lane-capacity) does not admit another lane: cpu: load 17.44 on 8 cores; captain reserve: my label
+exit=75
+jq: parse error: Invalid numeric literal at line 66, column 0
+{"admit":false,"free_lanes":0,"reasons":["cpu: load 17.44 on 8 cores","captain reserve: my label"]}
+{"flag":"present","label":"my label"}
+## S6 invalid
+capacity: free_lanes=unknown reason=invalid-target lanes=1 target=invalid secondmates=1 load1=17.44 cores=8 mem_free_pct=59 disk_free_mb=97844
+Lanes: 1 running, target unreadable (config/lane-capacity: line 2: unknown key 'bogus').
+Secondmates: 1 (hold no lane).
+fm-capacity: config/lane-capacity: line 2: unknown key 'bogus'
+fm-capacity: config/lane-capacity: line 2: unknown key 'bogus'
+exit=1
+fm-capacity: config/lane-capacity: line 2: unknown key 'bogus' (published as invalid)
+exit=0
+{"target":null,"status":"invalid"}
+## S7 usage
+usage: fm-capacity.sh [--json|--publish|--admit|--help]
+exit=2
+usage: fm-capacity.sh [--json|--publish|--admit|--help]
+exit=2

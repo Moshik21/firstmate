@@ -1,0 +1,19 @@
+## fresh ok beat, cap 3, 1 lane
+capacity: free_lanes=2 reason=ok lanes=1 target=3 secondmates=0 load1=18.99 cores=8 mem_free_pct=66 disk_free_mb=97842
+Lanes: 1 running of 3 target, 2 open.
+Host: load 18.99 on 8 cores, memory free 66%, disk free 97842 MB.
+Pressure: ok from beat.
+exit=0
+exit=0
+## publish then throttled republish
+exit=0
+exit=0
+mtime same (throttled): yes
+1
+exit=0
+2
+{"admit":true,"free_lanes":1,"reasons":[]}
+"beat"
+## beat goes on battery -> deferred
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.19KPjy/config/lane-capacity) does not admit another lane: on battery
+exit=75
