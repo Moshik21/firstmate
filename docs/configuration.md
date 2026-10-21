@@ -2734,6 +2734,7 @@ FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=8   # maximum local tasks whose current-state
 FM_SNAPSHOT_BUDGET=5                # one total seconds budget for all concurrent remote home-ledger reads
 FM_PLACE=                # off skips one bin/fm-place.sh placement call; see "Lane placement"
 FM_PLACE_NOW=            # test and replay override for bin/fm-place.sh's clock, in epoch seconds
+FM_LANE_CAPACITY_PUBLISH_INTERVAL=30   # seconds state/lane-capacity.json must be older than before bin/fm-capacity.sh --publish rewrites it; 0 always publishes; see "Lane capacity"
 FM_SNAPSHOT_CACHE_DIR=$FM_HOME/state/secondmate-summary-cache   # private parent-side cache of successfully fetched remote home ledgers
 FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS=14  # floored elapsed-day threshold at which an undated captain hold (no hold-until; age from its UTC hold-set timestamp, falling back to since for legacy unstamped holds) is projected as a Charted Next gate instead of a live Captain's Call; 0 applies once the computed age is non-negative
 FM_RECONCILE_REQUEST_MAX_BYTES=1048576   # maximum captured Bearings or fleet snapshot accepted for durable reconcile-notify request publication
