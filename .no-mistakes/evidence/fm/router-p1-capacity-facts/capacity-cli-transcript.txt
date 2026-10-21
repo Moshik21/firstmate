@@ -1,0 +1,82 @@
+### S1 no config: report, publish, admit
+capacity: free_lanes=unknown reason=no-target lanes=0 target=none secondmates=0 load1=8.52 cores=8 mem_free_pct=67 disk_free_mb=102163
+Lanes: 0 running, no target set (config/lane-capacity absent).
+Host: load 8.52 on 8 cores, memory free 67%, disk free 102163 MB.
+exit=0
+publish exit=0
+ls: /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.z977Xf/state/lane-capacity.json: No such file or directory
+admit exit=0
+
+### S2 cap 12 + keyed lines, json
+{
+  "schema": "fm-lane-capacity.v1",
+  "home": "main",
+  "cap": {
+    "target": 12,
+    "status": "ok"
+  },
+  "lanes": {
+    "count": 0,
+    "pr_ready": 0,
+    "ids": []
+  },
+  "limits": {
+    "min_avail_gb": null,
+    "min_disk_gb": 1,
+    "max_load1": null
+  },
+  "reserve": {
+    "flag": "absent",
+    "label": null
+  },
+  "verdict": {
+    "admit": false,
+    "free_lanes": 0,
+    "reasons": [
+      "cpu: load 8.52 on 8 cores"
+    ]
+  },
+  "pressure": {
+    "level": "warn",
+    "basis": "probe"
+  }
+}
+
+### S3 reserve flag present => constrained, admit 75
+capacity: free_lanes=0 reason=cpu,reserve lanes=0 target=12 secondmates=0 load1=8.52 cores=8 mem_free_pct=67 disk_free_mb=102163
+Lanes: 0 running of 12 target, 0 open.
+Host: load 8.52 on 8 cores, memory free 67%, disk free 102163 MB.
+Constrained: cpu,reserve - hold new dispatch until it clears.
+exit=0
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.z977Xf/config/lane-capacity) does not admit another lane: cpu: load 8.52 on 8 cores; captain reserve: host reserved
+admit exit=75
+
+### S4 publish file mode, throttle
+600
+mtime same (throttled): yes
+privacy: paths in doc?
+0
+
+### S5 invalid config
+capacity: free_lanes=unknown reason=invalid-target lanes=0 target=invalid secondmates=0 load1=8.52 cores=8 mem_free_pct=67 disk_free_mb=102163
+Lanes: 0 running, target unreadable (config/lane-capacity: line 2: unknown key 'bogus-key').
+Host: load 8.52 on 8 cores, memory free 67%, disk free 102163 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity: line 2: unknown key 'bogus-key'
+exit=1
+fm-capacity: config/lane-capacity: line 2: unknown key 'bogus-key'
+admit exit=1
+fm-capacity: config/lane-capacity: line 2: unknown key 'bogus-key'
+{"target":null,"status":"invalid"}
+{"admit":false,"free_lanes":null,"reasons":["config/lane-capacity: line 2: unknown key"]}
+
+### S6 beat pressure warn
+capacity: free_lanes=0 reason=cpu lanes=0 target=3 secondmates=0 load1=8.64 cores=8 mem_free_pct=67 disk_free_mb=102163
+Lanes: 0 running of 3 target, 0 open.
+Host: load 8.64 on 8 cores, memory free 67%, disk free 102163 MB.
+{"level":"warn","basis":"probe","beat_age_s":null}
+{"level":"warn","why":["pressure-file 1: not a lookout.beat 1.x document","load 8.64 on 8 cores"],"basis":"probe","beat_age_s":null,"avail_gb":10.72,"total_gb":16,"runq_per_core":1.08,"swap_rate_pps_1m":null,"mem_stall_pct":null,"load1":8.64,"on_battery":null,"disks":[{"label":"home","free_gb":99.8}]}
+
+### S7 usage error
+usage: fm-capacity.sh [--json|--publish|--admit|--help]
+exit=2

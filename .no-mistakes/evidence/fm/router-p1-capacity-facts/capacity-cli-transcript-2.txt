@@ -1,0 +1,27 @@
+### S6a fresh ok beat: 2 lanes of 3 -> 1 open; secondmate holds none
+capacity: free_lanes=1 reason=ok lanes=2 target=3 secondmates=1 load1=11.62 cores=8 mem_free_pct=67 disk_free_mb=102159
+Lanes: 2 running of 3 target, 1 open.
+Secondmates: 1 (hold no lane).
+admit=0
+### S6b fresh warn beat -> closed, reason pressure
+capacity: free_lanes=0 reason=pressure lanes=2 target=3 secondmates=1 load1=11.62 cores=8 mem_free_pct=67 disk_free_mb=102157
+Host: load 11.62 on 8 cores, memory free 67%, disk free 102157 MB.
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.Ecvyzk/config/lane-capacity) does not admit another lane: pressure warn: swap churn
+admit=75
+fm-capacity: pressure: swap churn
+fm-capacity: reason: pressure warn: swap churn
+{"lanes":{"count":2,"pr_ready":1,"ids":["t1","t2"]},"pressure":{"level":"warn","basis":"beat"},"verdict":{"admit":false,"free_lanes":0,"reasons":["pressure warn"]}}
+### S6c stale beat (mtime 10min old) -> probe fallback, skipped
+{"basis":"probe","why":["beat-host: beat 603 s old","load 11.62 on 8 cores"]}
+### S8 publish doc
+{"schema":"fm-lane-capacity.v1","lanes":{"count":2,"pr_ready":1,"ids":["t1","t2"]},"cap":{"target":3,"status":"ok"},"verdict":{"admit":false,"free_lanes":0,"reasons":["cpu: load 11.09 on 8 cores"]}}
+600
+### S9 --help
+fm-capacity.sh - report open lanes and host headroom for queued-work dispatch,
+and publish this home's lane facts for placement.
+
+Usage:
+  fm-capacity.sh            the report: one key=value line, then a human summary
+  fm-capacity.sh --json     the fm-lane-capacity.v1 document on stdout
+  fm-capacity.sh --publish  write that document to state/lane-capacity.json
+  fm-capacity.sh --admit    this home's own admission verdict as an exit status
