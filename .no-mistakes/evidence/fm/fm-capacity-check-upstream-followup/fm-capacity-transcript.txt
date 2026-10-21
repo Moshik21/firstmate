@@ -1,0 +1,67 @@
+== S1 no config
+$ no lane-capacity
+capacity: free_lanes=unknown reason=no-target lanes=2 target=none secondmates=1 load1=11.65 cores=8 mem_free_pct=50 disk_free_mb=107641
+Lanes: 2 running, no target set (config/lane-capacity absent).
+Secondmates: 1 (hold no lane).
+Host: load 11.65 on 8 cores, memory free 50%, disk free 107641 MB.
+exit=0
+
+== S2 target 5, 2 lanes
+$ target 5
+capacity: free_lanes=0 reason=cpu lanes=2 target=5 secondmates=1 load1=11.65 cores=8 mem_free_pct=50 disk_free_mb=107641
+Lanes: 2 running of 5 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 11.65 on 8 cores, memory free 50%, disk free 107641 MB.
+Constrained: cpu - hold new dispatch until it clears.
+exit=0
+
+== S3 target 2 = full
+$ target 2
+capacity: free_lanes=0 reason=cpu lanes=2 target=2 secondmates=1 load1=11.65 cores=8 mem_free_pct=50 disk_free_mb=107641
+Lanes: 2 running of 2 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 11.65 on 8 cores, memory free 50%, disk free 107641 MB.
+Constrained: cpu - hold new dispatch until it clears.
+exit=0
+
+== S4 two-line
+$ two-line
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=11.65 cores=8 mem_free_pct=50 disk_free_mb=107641
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 11.65 on 8 cores, memory free 50%, disk free 107641 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+exit=1
+
+== S5 inner space
+$ 1 2
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=11.65 cores=8 mem_free_pct=50 disk_free_mb=107641
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 11.65 on 8 cores, memory free 50%, disk free 107641 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+exit=1
+
+== S6 overflow
+$ overflow
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=11.65 cores=8 mem_free_pct=50 disk_free_mb=107641
+Lanes: 2 running, target unreadable (config/lane-capacity must hold one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 11.65 on 8 cores, memory free 50%, disk free 107641 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity must hold one non-negative integer
+exit=1
+
+== S7 surrounding ws
+$ '  7  '
+capacity: free_lanes=0 reason=cpu lanes=2 target=7 secondmates=1 load1=11.65 cores=8 mem_free_pct=50 disk_free_mb=107641
+Lanes: 2 running of 7 target, 0 open.
+Secondmates: 1 (hold no lane).
+Host: load 11.65 on 8 cores, memory free 50%, disk free 107641 MB.
+Constrained: cpu - hold new dispatch until it clears.
+exit=0
+
+usage: fm-capacity.sh [--help]
+bogus exit=2
