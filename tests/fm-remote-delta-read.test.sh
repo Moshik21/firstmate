@@ -117,9 +117,7 @@ printf 'alpha\nbeta\n' > "$DELTA_HOME/$DELTA_LOG_REL"
 run_reader 11 "$PREFIX_SHA" 4 > "$TMP_ROOT/rewrite.out" &
 READER_PID=$!
 sleep 1.1
-# conv=notrunc overwrites in place: a plain `>` truncates first, and a poll in
-# that window would see size 0 and report truncated instead of prefix-changed.
-printf 'OMEGA\nbeta\n' | dd of="$DELTA_HOME/$DELTA_LOG_REL" conv=notrunc 2>/dev/null
+printf 'OMEGA\nbeta\n' > "$DELTA_HOME/$DELTA_LOG_REL"
 wait "$READER_PID" || fail 'the rewritten read did not exit 0'
 OUT=$(<"$TMP_ROOT/rewrite.out")
 assert_contains "$OUT" 'status=continuity-broken' 'a same-size rewrite did not produce a break'
