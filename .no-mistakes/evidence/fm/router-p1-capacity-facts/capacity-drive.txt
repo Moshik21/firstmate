@@ -1,0 +1,86 @@
+## S1 no config: report, publish noop, admit 0
+capacity: free_lanes=unknown reason=no-target lanes=2 target=none secondmates=1 load1=12.80 cores=8 mem_free_pct=49 disk_free_mb=97870
+Lanes: 2 running, no target set (config/lane-capacity absent).
+Secondmates: 1 (hold no lane).
+Host: load 12.80 on 8 cores, memory free 49%, disk free 97870 MB.
+rc=0
+publish rc=0 file: ls: /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//capdrive.dj8fxP/state/lane-capacity.json: No such file or directory
+admit rc=0
+
+## S2 cap 5, 2 lanes: json + publish
+{
+  "schema": "fm-lane-capacity.v1",
+  "lanes": {
+    "count": 2,
+    "pr_ready": 1,
+    "ids": [
+      "t1",
+      "t2"
+    ]
+  },
+  "cap": {
+    "target": 5,
+    "status": "ok"
+  },
+  "projects": [
+    "alpha"
+  ],
+  "verdict": {
+    "admit": false,
+    "free_lanes": 0,
+    "reasons": [
+      "cpu: load 12.80 on 8 cores"
+    ]
+  },
+  "reserve": {
+    "flag": "not-configured",
+    "label": null
+  },
+  "captain": "not-configured",
+  "quota": null,
+  "limits": {
+    "min_avail_gb": null,
+    "min_disk_gb": null,
+    "max_load1": null
+  }
+}
+publish rc=0
+600
+{"admit":false,"free_lanes":0,"reasons":["cpu: load 12.80 on 8 cores"]}
+
+## S3 throttle: second publish within 30s leaves file untouched
+touch: /dev/null: Permission denied
+mtime same: yes
+
+## S4 cap 2 = full -> admit 75
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//capdrive.dj8fxP/config/lane-capacity) does not admit another lane: cpu: load 12.80 on 8 cores
+admit rc=75
+capacity: free_lanes=0 reason=cpu lanes=2 target=2 secondmates=1 load1=12.80 cores=8 mem_free_pct=49 disk_free_mb=97870
+Lanes: 2 running of 2 target, 0 open.
+Secondmates: 1 (hold no lane).
+
+## S5 reserve flag
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//capdrive.dj8fxP/config/lane-capacity) does not admit another lane: cpu: load 12.80 on 8 cores; captain reserve: flag-label
+admit rc=75
+{"reserve":{"flag":"present","label":"flag-label"},"verdict":{"admit":false,"free_lanes":0,"reasons":["cpu: load 12.80 on 8 cores","captain reserve: flag-label"]}}
+
+## S6 invalid config
+capacity: free_lanes=unknown reason=invalid-target lanes=2 target=invalid secondmates=1 load1=12.80 cores=8 mem_free_pct=49 disk_free_mb=97870
+Lanes: 2 running, target unreadable (config/lane-capacity: line 2: unknown key 'bogus-key').
+Secondmates: 1 (hold no lane).
+Host: load 12.80 on 8 cores, memory free 49%, disk free 97870 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity: line 2: unknown key 'bogus-key'
+report rc=1
+fm-capacity: config/lane-capacity: line 2: unknown key 'bogus-key'
+admit rc=1
+fm-capacity: config/lane-capacity: line 2: unknown key 'bogus-key' (published as invalid)
+publish rc=0
+{"target":null,"status":"invalid"}
+{"admit":false,"free_lanes":null,"reasons":["config/lane-capacity: line 2: unknown key"]}
+
+## S7 usage
+usage: fm-capacity.sh [--json|--publish|--admit|--help]
+rc=2
+usage: fm-capacity.sh [--json|--publish|--admit|--help]
+rc=2
