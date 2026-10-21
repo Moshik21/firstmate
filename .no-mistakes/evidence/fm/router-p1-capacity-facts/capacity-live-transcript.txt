@@ -1,0 +1,43 @@
+### 1. no config: report
+capacity: free_lanes=unknown reason=no-target lanes=1 target=none secondmates=0 load1=24.28 cores=8 mem_free_pct=46 disk_free_mb=106973
+Lanes: 1 running, no target set (config/lane-capacity absent).
+Host: load 24.28 on 8 cores, memory free 46%, disk free 106973 MB.
+rc=0
+### 1b. no config: --admit rc
+rc=0
+### 1c. no config: --publish must write nothing
+rc=0
+ship-1.meta
+### 2. config target 3
+capacity: free_lanes=0 reason=cpu lanes=1 target=3 secondmates=0 load1=24.28 cores=8 mem_free_pct=46 disk_free_mb=106973
+Lanes: 1 running of 3 target, 0 open.
+Host: load 24.28 on 8 cores, memory free 46%, disk free 106973 MB.
+Constrained: cpu - hold new dispatch until it clears.
+rc=0
+### 2b. admit
+deferred: lane capacity of this home (<lab-home>/config/lane-capacity) does not admit another lane: cpu: load 24.28 on 8 cores; the lane was not launched and its backlog item stays queued
+rc=75
+### 3. json
+{"schema":"fm-lane-capacity.v1","cap":{"target":3,"status":"ok"},"verdict":{"admit":false,"free_lanes":0,"reasons":["cpu: load 24.28 on 8 cores"]}}
+### 3b. publish
+rc=0
+-rw-------@ 1 konnermoshier  staff  1101 Oct 20 20:01 <lab-home>/state/lane-capacity.json
+fm-lane-capacity.v1
+### 4. target 1 (full)
+capacity: free_lanes=0 reason=cpu lanes=1 target=1 secondmates=0 load1=23.05 cores=8 mem_free_pct=46 disk_free_mb=106974
+Lanes: 1 running of 1 target, 0 open.
+Host: load 23.05 on 8 cores, memory free 46%, disk free 106974 MB.
+deferred: lane capacity of this home (<lab-home>/config/lane-capacity) does not admit another lane: cpu: load 23.05 on 8 cores; the lane was not launched and its backlog item stays queued
+admit rc=75
+### 5. malformed
+capacity: free_lanes=unknown reason=invalid-target lanes=1 target=invalid secondmates=0 load1=23.05 cores=8 mem_free_pct=46 disk_free_mb=106974
+Lanes: 1 running, target unreadable (config/lane-capacity: line 1: the first line must be the lane cap, one non-negative integer).
+Host: load 23.05 on 8 cores, memory free 46%, disk free 106974 MB.
+Constrained: cpu - hold new dispatch until it clears.
+fm-capacity: config/lane-capacity: line 1: the first line must be the lane cap, one non-negative integer
+rc=1
+### 6. keyed with reserve flag
+capacity: free_lanes=0 reason=cpu,load lanes=1 target=4 secondmates=0 load1=23.05 cores=8 mem_free_pct=46 disk_free_mb=106974
+Lanes: 1 running of 4 target, 0 open.
+deferred: lane capacity of this home (<lab-home>/config/lane-capacity) does not admit another lane: cpu: load 23.05 on 8 cores; load: 23.05 over its max-load1 0.001; the lane was not launched and its backlog item stays queued
+admit rc=75
