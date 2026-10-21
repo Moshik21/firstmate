@@ -178,7 +178,7 @@ write_beat() {
   local why_json='[]'
   [ -z "$why" ] || why_json="[\"$why\"]"
   cat > "$1" <<JSON
-{"schema":"lookout.beat","schema_version":"1.0","host":"beat-host","os":"linux","interval_s":15,
+{"schema":"lookout.beat","schema_version":"1.0","host":"beat-host","os":"wsl","interval_s":15,
  "machine":{"id":"beat-host","status":"$2","load":{"l1":$6,"runq_per_core":$5},
   "mem":{"avail_gb":$3,"total_gb":$4,"swap_rate_pps_1m":0.5,"psi_some10":1.25},
   "disks":[{"label":"disk","free_gb":$disk}],"uptime_s":5000,"on_battery":$7,
@@ -408,7 +408,7 @@ test_publish_document() {
   printf '%s\n' 34359738368 > "$fakebin/memsize"
   printf '%s\n' 1791484127 > "$fakebin/boottime"
   fm_write_meta "$home/state/ship-1.meta" "kind=ship" "mode=no-mistakes" "pr=https://github.com/o/r/pull/9"
-  printf 'pc-lanes\n' > "$home/.fm-secondmate-home"
+  printf 'lanes-a\n' > "$home/.fm-secondmate-home"
   mkdir -p "$home/projects/alpha" "$home/projects/beta"
   touch "$home/state/.last-watcher-beat"
   run_capacity_jq "$home" "$fakebin" --publish >/dev/null; rc=$?
@@ -418,7 +418,7 @@ test_publish_document() {
   FM_LANE_CAPACITY_PUBLISH_INTERVAL=0 run_capacity_jq "$home" "$fakebin" --publish >/dev/null; rc=$?
   expect_code 0 "$rc" "publish"
   doc=$(cat "$home/state/lane-capacity.json")
-  assert_equals 'fm-lane-capacity.v1|pc-lanes|2|1|ship-0,ship-1|6|ok|alpha,beta|probe|19.2|32|0.06|4|null|null' \
+  assert_equals 'fm-lane-capacity.v1|lanes-a|2|1|ship-0,ship-1|6|ok|alpha,beta|probe|19.2|32|0.06|4|null|null' \
     "$(printf '%s\n' "$doc" | jq -r '[.schema,.home,.lanes.count,.lanes.pr_ready,(.lanes.ids | join(",")),.cap.target,.cap.status,(.projects | join(",")),.pressure.basis,.pressure.avail_gb,.pressure.total_gb,.pressure.runq_per_core,.limits.min_avail_gb,.limits.max_load1,.quota] | map(tostring) | join("|")')" \
     "the published document must carry lanes, cap, projects, and probe pressure"
   assert_equals 'true|4|not-configured|not-configured|1791484127|[1791484127]|true' \
