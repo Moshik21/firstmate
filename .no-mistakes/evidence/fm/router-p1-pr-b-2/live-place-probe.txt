@@ -1,0 +1,105 @@
+## 1. off by default (no config)
+place: off (config/lane-placement.json absent)
+rc=0
+## 2. publish real host facts
+rc=0
+{
+  "schema": "fm-lane-capacity.v1",
+  "generated_epoch": 1792562658,
+  "home": "main",
+  "machine": "Mac",
+  "lanes": {
+    "count": 0,
+    "pr_ready": 0,
+    "ids": []
+  },
+  "cap": {
+    "target": 4,
+    "status": "ok"
+  },
+  "projects": [],
+  "pressure": {
+    "level": "warn",
+    "why": [
+      "load 11.33 on 8 cores"
+    ],
+    "basis": "probe",
+    "beat_age_s": null,
+    "avail_gb": 11.04,
+    "total_gb": 16,
+    "runq_per_core": 1.42,
+    "swap_rate_pps_1m": null,
+    "mem_stall_pct": null,
+    "load1": 11.33,
+    "on_battery": null,
+    "disks": [
+      {
+        "label": "home",
+   
+## 3. advise on live facts
+place:
+  status: full   mode: advise   task: t1   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: main -> not eligible: no demo clone in this home; pressure warn: load 11.33 on 8 cores
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1792562658-t1
+rc=0
+## 4. profile requires tag not offered
+place:
+  status: full   mode: advise   task: t2   project: demo (no-mistakes)   profile: win 1 GB
+  candidate: main -> not eligible: no demo clone in this home; lacks windows-host; pressure warn: load 11.33 on 8 cores
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1792562658-t2
+rc=0
+## 5. kill switch
+place: off (FM_PLACE=off)
+rc=0
+## 6. bad usage / undeclared home
+fm-place: unknown home 'ghost': not main and not one registered secondmate in data/secondmates.md
+rc=2
+fm-place: --delivery must be no-mistakes, direct-PR, or local-only
+rc=2
+## 7. outcome + review, --json
+place-outcome: recorded t1 -> main by firstmate (followed: no advice)
+place-review:
+  span: 14 d   advice: 2   outcomes: 1
+  status: full 2
+  agreement: 0 of 0 followed
+  home: main   advised 0   chosen 1   listed 2   unknown 0 (unreachable 0)   refused: no demo clone in this home 2, pressure warn 2, lacks windows-host 1
+{"v":1,"ts":1792562658,"event":"place.advice","id":"1792562658-t5","mode":"advise","task":"t5","project":"demo","delivery":"local-only","profile":"default","footprint_gb":1.0,"requires":[],"fitting":["main"],"fallback":[],"captain_named":null,"facts_ms":0,"status":"full","reason":"every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat","candidates":[{"home":"main","group":"fitting","rank":1,"lanes":0,"cap":4,"pending":1,"pr
+## 8. stale facts -> unknown
+place:
+  status: ambiguous   mode: advise   task: t6   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: main -> unknown: facts 9999 s old (home not publishing)
+  reason: no home is rankable on known facts (main: facts 9999 s old (home not publishing)); decide as today
+  log: 1792572657-t6
+rc=0
+## 9. log perms / no spawn side effects
+600
+lane-capacity.json
+lane-placement.jsonl
+## 10 admit advisory
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.TG2Q6g/config/lane-capacity) does not admit another lane: cpu: load 11.33 on 8 cores
+rc=75
+## 11. with project clone, republished facts
+place:
+  status: full   mode: advise   task: t7   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: main -> not eligible: no demo clone in this home; pressure warn: load 11.33 on 8 cores
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1792562664-t7
+rc=0
+## 12. captain-named
+place:
+  status: captain   mode: advise   task: t8   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: main -> not eligible: no demo clone in this home; pressure warn: load 11.33 on 8 cores
+  reason: the captain named this home
+  note: facts for the captain's choice, for the record only: no demo clone in this home; pressure warn: load 11.33 on 8 cores
+  place: main
+  log: 1792562664-t8
+rc=0
+## 13. republished after removing throttled file (clone now listed)
+place:
+  status: full   mode: advise   task: t9   project: demo (no-mistakes)   profile: default 1 GB
+  candidate: main -> not eligible: pressure warn: load 9.77 on 8 cores
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1792562675-t9
+rc=0
