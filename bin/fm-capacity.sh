@@ -554,7 +554,7 @@ if [ "$mode" = admit ]; then
     exit 1
   fi
   [ "$admit" = true ] && exit 0
-  echo "deferred: lane capacity of this home ($LANE_CONFIG) does not admit another lane: $(printf '%s' "$reasons" | paste -sd ';' - | sed 's/;/; /g'); the lane was not launched and its backlog item stays queued" >&2
+  echo "deferred: lane capacity of this home ($LANE_CONFIG) does not admit another lane: $(printf '%s' "$reasons" | paste -sd ';' - | sed 's/;/; /g')" >&2
   exit 75
 fi
 
