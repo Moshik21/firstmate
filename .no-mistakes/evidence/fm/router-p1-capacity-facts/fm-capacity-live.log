@@ -1,0 +1,82 @@
+## 1. no config: report, no Constrained line, admit 0, publish writes nothing
+capacity: free_lanes=unknown reason=no-target lanes=0 target=none secondmates=0 load1=6.77 cores=8 mem_free_pct=60 disk_free_mb=100376
+Lanes: 0 running, no target set (config/lane-capacity absent).
+Host: load 6.77 on 8 cores, memory free 60%, disk free 100376 MB.
+rc=0
+admit rc=0
+publish rc=0
+
+## 2. config cap 3, two lanes + one secondmate + pr
+capacity: free_lanes=1 reason=ok lanes=2 target=3 secondmates=1 load1=6.77 cores=8 mem_free_pct=60 disk_free_mb=100376
+Lanes: 2 running of 3 target, 1 open.
+Secondmates: 1 (hold no lane).
+Host: load 6.77 on 8 cores, memory free 60%, disk free 100376 MB.
+rc=0
+{
+  "schema": "fm-lane-capacity.v1",
+  "lanes": {
+    "count": 2,
+    "pr_ready": 1,
+    "ids": [
+      "a",
+      "b"
+    ]
+  },
+  "cap": {
+    "target": 3,
+    "status": "ok"
+  },
+  "verdict": {
+    "admit": true,
+    "free_lanes": 1,
+    "reasons": []
+  },
+  "limits": {
+    "min_avail_gb": null,
+    "min_disk_gb": null,
+    "max_load1": null
+  },
+  "reserve": {
+    "flag": "not-configured",
+    "label": null
+  },
+  "captain": "not-configured"
+}
+admit rc=0
+
+## 3. at cap -> admit 75
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-cap-home.pfj5cX/config/lane-capacity) does not admit another lane: full: 3 of 3 lanes
+admit rc=75
+capacity: free_lanes=0 reason=full lanes=3 target=3 secondmates=1 load1=6.77 cores=8 mem_free_pct=60 disk_free_mb=100376
+
+## 4. publish
+rc=0
+-rw-------@ 1 konnermoshier  staff  1082 Oct 22 16:02 /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-cap-home.pfj5cX/state/lane-capacity.json
+{"schema":"fm-lane-capacity.v1","home":"main","lanes":{"count":3,"pr_ready":1,"ids":["a","b","c"]},"cap":{"target":3,"status":"ok"},"verdict":{"admit":false,"free_lanes":0,"reasons":["full: 3 of 3 lanes"]},"projects":["demo"]}
+## 4b. throttle
+rc=0
+
+## 5. keyed limits + reserve flag
+capacity: free_lanes=0 reason=disk,reserve lanes=3 target=3 secondmates=1 load1=6.77 cores=8 mem_free_pct=60 disk_free_mb=100376
+Lanes: 3 running of 3 target, 0 open.
+Secondmates: 1 (hold no lane).
+deferred: lane capacity of this home (/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-cap-home.pfj5cX/config/lane-capacity) does not admit another lane: disk: home 98.0 GB free, under 99999999 GB; captain reserve: reserved
+admit rc=75
+{"admit":false,"free_lanes":0,"reasons":["disk: home 98.0 GB free, under 99999999 GB","captain reserve: reserved"]}
+{"flag":"present","label":"reserved"}
+
+## 6. malformed config
+capacity: free_lanes=unknown reason=invalid-target lanes=3 target=invalid secondmates=1 load1=6.77 cores=8 mem_free_pct=60 disk_free_mb=100376
+Lanes: 3 running, target unreadable (config/lane-capacity: line 1: the first line must be the lane cap, one non-negative integer).
+Secondmates: 1 (hold no lane).
+Host: load 6.77 on 8 cores, memory free 60%, disk free 100376 MB.
+fm-capacity: config/lane-capacity: line 1: the first line must be the lane cap, one non-negative integer
+rc=1
+fm-capacity: config/lane-capacity: line 1: the first line must be the lane cap, one non-negative integer
+admit rc=1
+
+## 7. usage
+usage: fm-capacity.sh [--json|--publish|--admit|--help]
+rc=2
+usage: fm-capacity.sh [--json|--publish|--admit|--help]
+rc=2
