@@ -1,0 +1,9 @@
+# S4 unknown fitting home (stale facts) + eligible main -> wording from fix
+place:
+  status: clear   mode: advise   task: t4   project: proj (no-mistakes)   profile: default 1 GB
+  candidate: lanes-a -> unknown: facts 3601 s old (home not publishing)
+  candidate: main (fallback) -> eligible score 68: mem 40/40 cpu 23/25 room 20/20 captain -15  [lanes 0/8, 12 GB free, runq 0.2/core, facts 2 s]
+  note: no fitting home is eligible or unranked (lanes-a: facts 3601 s old (home not publishing)); main is the fallback
+  place: main
+  log: 1793044919-t4
+rc=0

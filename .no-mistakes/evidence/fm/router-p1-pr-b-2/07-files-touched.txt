@@ -1,0 +1,6 @@
+sm-a/.fm-secondmate-home
+sm-a/state/lane-capacity.json
+sm-b/.fm-secondmate-home
+sm-b/state/lane-capacity.json
+state/lane-capacity.json
+state/lane-placement.jsonl

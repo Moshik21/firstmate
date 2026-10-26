@@ -1,0 +1,31 @@
+# S5 captain-named home wins, facts shown for the record
+place:
+  status: captain   mode: advise   task: t5   project: proj (no-mistakes)   profile: default 1 GB
+  candidate: lanes-a -> eligible score 83: mem 40/40 cpu 23/25 room 20/20  [lanes 0/8, 12 GB free, runq 0.2/core, facts 0 s]
+  candidate: lanes-b -> eligible score 83: mem 40/40 cpu 23/25 room 20/20  [lanes 0/8, 12 GB free, runq 0.2/core, facts 0 s]
+  candidate: main (fallback) -> eligible score 68: mem 40/40 cpu 23/25 room 20/20 captain -15  [lanes 0/8, 12 GB free, runq 0.2/core, facts 1 s]
+  reason: the captain named this home
+  place: lanes-a
+  log: 1793044929-t5
+rc=0
+# S6 task already running in a candidate -> error
+place:
+  status: error   mode: advise   task: t6   project: proj (no-mistakes)   profile: default 1 GB
+  candidate: lanes-a -> error: task t6 already runs here: placement is for new lanes only
+  candidate: main (fallback) -> eligible score 68: mem 40/40 cpu 23/25 room 20/20 captain -15  [lanes 0/8, 12 GB free, runq 0.2/core, facts 1 s]
+  reason: task t6 already runs here: placement is for new lanes only
+  log: 1793044929-t6
+rc=0
+# S7 FM_PLACE=off
+place: off (FM_PLACE=off)
+rc=0
+# S8 usage errors
+fm-place: unknown home 'nosuch': not main and not one registered secondmate in data/secondmates.md
+rc=2
+fm-place: unknown argument --bogus (see --help)
+rc=2
+fm-place: --task is required
+rc=2
+# S9 json
+{"v":1,"ts":1793044930,"event":"place.advice","id":"1793044930-t9","mode":"advise","task":"t9","project":"proj","delivery":"no-mistakes","profile":"default","footprint_gb":1.0,"requires":[],"fitting":["lanes-b"],"fallback":[],"captain_named":null,"facts_ms":0,"status":"clear","place":"lanes-b","candidates":[{"home":"lanes-b","group":"fitting","rank":1,"lanes":0,"cap":8,"pending":0,"pressure":"ok","basis":"probe","facts_age_s":1,"avail_gb":12,"runq_per_core":0.2,"captain":"not-configured","class":"eligible","reasons":[],"terms":{"mem":40,"cpu":23,"room":20,"captain":0,"quota":0,"unstable":0},"s
+-rw-------@ 1 konnermoshier  staff  11974 Oct 26 13:02 /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.IGh6QH/state/lane-placement.jsonl

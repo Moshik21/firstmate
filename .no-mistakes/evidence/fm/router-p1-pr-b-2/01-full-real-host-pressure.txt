@@ -1,0 +1,9 @@
+# S1 clear: fitting lanes-a,lanes-b, fallback main (real fm-capacity facts)
+place:
+  status: full   mode: advise   task: t1   project: proj (no-mistakes)   profile: default 1 GB
+  candidate: lanes-a -> not eligible: pressure warn: load 17.14 on 8 cores
+  candidate: lanes-b -> not eligible: pressure warn: load 17.14 on 8 cores
+  candidate: main (fallback) -> not eligible: pressure warn: load 17.14 on 8 cores
+  reason: every in-scope home is full, under pressure or reserved; keep the item queued and re-evaluate at the next teardown or heartbeat
+  log: 1793044857-t1
+rc=0

@@ -1,0 +1,9 @@
+# S2 clear: all homes unpressured
+place:
+  status: clear   mode: advise   task: t2   project: proj (no-mistakes)   profile: default 1 GB
+  candidate: lanes-a -> eligible score 53: mem 10/40 cpu 23/25 room 20/20  [lanes 0/8, 5 GB free, runq 0.2/core, facts 7 s]
+  candidate: lanes-b -> eligible score 83: mem 40/40 cpu 23/25 room 20/20  [lanes 0/8, 12 GB free, runq 0.2/core, facts 0 s]
+  candidate: main (fallback) -> eligible score 68: mem 40/40 cpu 23/25 room 20/20 captain -15  [lanes 0/8, 12 GB free, runq 0.2/core, facts 21 s]
+  place: lanes-b
+  log: 1793044914-t2
+rc=0

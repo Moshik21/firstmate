@@ -1,0 +1,14 @@
+place-outcome: recorded t2 -> lanes-b by firstmate (followed: yes)
+rc=0
+fm-place: outcome reason (not logged): keep with sibling
+place-outcome: recorded t3 -> lanes-a by captain (followed: no)
+rc=0
+place-review:
+  span: 14 d   advice: 11   outcomes: 2
+  status: clear 4, full 3, ambiguous 2, captain 1, error 1
+  agreement: 1 of 2 followed (50%)
+  override: t3 advised main chose lanes-a by captain
+  home: lanes-a   advised 1   chosen 1   listed 10   unknown 3 (unreachable 0)   refused: pressure warn 3, its own verdict 1
+  home: lanes-b   advised 2   chosen 1   listed 9   unknown 2 (unreachable 0)   refused: pressure warn 3, its own verdict 1
+  home: main   advised 2   chosen 0   listed 10   unknown 0 (unreachable 0)   refused: pressure warn 3, its own verdict 2, no proj clone in this home 1
+rc=0
