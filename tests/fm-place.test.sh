@@ -185,7 +185,7 @@ test_worked_examples() {
   assert_contains "$out" 'candidate: lanes-a -> not eligible: captain-reserve' "s3a pc reserved"
   assert_not_contains "$(cat "$w/main/state/lane-placement.jsonl")" 'host-a reserved' "s3a reserve label never logged"
   assert_contains "$out" 'candidate: main (fallback) -> eligible score 22: mem 5/40 cpu 20/25 room 12/20 captain -15  [lanes 4/10, 5.5 GB free, runq 0.6/core, facts 5 s]' "s3a main with the captain term"
-  assert_contains "$out" 'note: every fitting home is blocked (lanes-a: captain-reserve; lanes-b: full: 12 of 12 lanes); main is the fallback' "s3a fallback note"
+  assert_contains "$out" 'note: no fitting home is eligible or unranked (lanes-a: captain-reserve; lanes-b: full: 12 of 12 lanes); main is the fallback' "s3a fallback note"
   assert_contains "$out" 'place: main' "s3a place"
 
   mk "$w/main" main host-c $T 5 4 10 ok '[]' 4.8 16 0.6 400000 present "" 4 "$OLD"

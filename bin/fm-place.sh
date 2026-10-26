@@ -12,10 +12,11 @@
 #
 # Firstmate runs the first form at intake after it has routed by scope:
 # --fitting names the homes whose scope fits, --fallback the homes to use only
-# when every fitting home is blocked (in practice main), and --captain the home
-# the captain named for this lane, which is always the answer. A home id is
-# main (this home) or a secondmate id in data/secondmates.md, and must also be
-# declared in config/lane-placement.json.
+# when no fitting home is eligible or unranked (in practice main; a fitting home
+# whose facts are unreachable, stale, or missing counts as not eligible), and
+# --captain the home the captain named for this lane, which is always the
+# answer. A home id is main (this home) or a secondmate id in
+# data/secondmates.md, and must also be declared in config/lane-placement.json.
 #
 # Opt-in: config/lane-placement.json present with "mode": "advise".
 #   Off is one "place: off (<why>)" line on stderr, nothing on stdout, exit 0:
@@ -43,7 +44,7 @@
 #     note: <tie-break, fallback, or the captain's-choice facts>
 #     place: <home>                       (clear and captain only)
 #     log: <decision-id> | unwritten (<why>)
-#   clear     -> one best home: the best fitting home, or the best fallback when every fitting home is blocked
+#   clear     -> one best home: the best fitting home, or the best fallback when no fitting home is eligible or unranked
 #   captain   -> the captain named the home; its facts are shown for the record only
 #   ambiguous -> no home is rankable on known facts; decide as today
 #   full      -> every candidate is refused for a temporary reason; keep the item queued
@@ -611,7 +612,7 @@ def tie($o): if ($o | length) > 1 and $o[1].score == $o[0].score
  elif ($okf | length) > 0 then {status: "clear", place: $okf[0].home,
    note: ([if $delivery == "local-only" and $okf[0].home == "main" and all($cs[] | select(.group == "fitting"); .reasons == ["local-only work stays in the main home"])
            then "local-only work stays in the main home"
-           else "every fitting home is blocked (\($blocked)); \($okf[0].home) is the fallback" end, tie($okf)] | map(select(. != null)) | join("; "))}
+           else "no fitting home is eligible or unranked (\($blocked)); \($okf[0].home) is the fallback" end, tie($okf)] | map(select(. != null)) | join("; "))}
  elif has("fallback"; "unranked") or any($cs[] | select(.group != "captain"); .class == "unknown")
    then {status: "ambiguous", reason: "no home is rankable on known facts (\(named(["unknown", "unranked"])))\(if any($cs[]; .class == "refused") then "; every other home is refused" else "" end); decide as today"}
  elif all($cs[] | select(.group != "captain"); .class == "refused" and .permanent) then {status: "escalate", reason: "no in-scope home can run this lane"}
