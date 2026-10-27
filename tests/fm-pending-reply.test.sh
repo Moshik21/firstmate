@@ -38,6 +38,10 @@
 #      the decision; a retry while that decision is still open appends nothing
 #  19. A request summary keeps accented letters, drops control characters, and
 #      caps at 120 characters without splitting one under any caller locale
+#  20. The inbox-status format reports the unhandled count, the oldest age, the
+#      composer verdict and an unhandled, handled or absent correlation state
+#  21. A local mate's unread request raises no tracker escalation (the remote
+#      reconciliation scenarios live in tests/fm-send-remote-delivery.test.sh)
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -2123,6 +2127,81 @@ test_summary_keeps_accents_and_caps_by_character() {
   pass "the summary keeps accented letters, drops control characters, and caps by character"
 }
 
+# Write one record into <state>'s steering inbox for <task> through the
+# production owner (bin/fm-task-inbox-lib.sh).
+inbox_write() {  # <state> <task> <text>
+  FM_STATE_OVERRIDE="$1" bash -c '. "$1"; fm_task_inbox_write "$2" "$3" "$4"' \
+    _ "$ROOT/bin/fm-task-inbox-lib.sh" "$1" "$2" "$3" >/dev/null
+}
+
+# The inbox-status format and the correlation states the reply tracker reads.
+test_inbox_status_reports_unhandled_handled_and_absent() {
+  local home state inbox out corr_a corr_b corr_c
+  home=$(setup_parent inbox-status)
+  state="$home/state"
+  inbox="$state/t1.inbox"
+  corr_a=aaaaaaaaaaaaaaaa; corr_b=bbbbbbbbbbbbbbbb; corr_c=cccccccccccccccc
+
+  [ "$(fm_pending_reply_inbox_corr_state "$inbox" "$corr_a")" = absent ] \
+    || fail "an inbox that does not exist holds no record"
+  out=$(fm_pending_reply_inbox_status_report "$state" t1 "$corr_a")
+  [ "$(printf '%s\n' "$out" | head -1)" = "schema=fm-inbox-status.v1" ] \
+    || fail "the status must lead with its schema line: $out"
+  assert_contains "$out" "unhandled=0" "an absent inbox has no unhandled records"
+  assert_contains "$out" "corr_state=absent" "an absent inbox does not hold the correlation"
+  assert_contains "$out" "composer=unknown" "the composer verdict defaults to unknown"
+
+  inbox_write "$state" t1 "[fm] corr=$corr_a first"
+  inbox_write "$state" t1 "[fm] corr=$corr_b second"
+  mv "$inbox/002.msg" "$inbox/handled/002.msg"
+  [ "$(fm_pending_reply_inbox_corr_state "$inbox" "$corr_a")" = unhandled ] \
+    || fail "a waiting record must read unhandled"
+  [ "$(fm_pending_reply_inbox_corr_state "$inbox" "$corr_b")" = handled ] \
+    || fail "an acknowledged record must read handled"
+  [ "$(fm_pending_reply_inbox_corr_state "$inbox" "$corr_c")" = absent ] \
+    || fail "a correlation never written must read absent"
+
+  # A recovery repost carries the same token: unhandled wins over handled.
+  inbox_write "$state" t1 "[fm] corr=$corr_b repost"
+  [ "$(fm_pending_reply_inbox_corr_state "$inbox" "$corr_b")" = unhandled ] \
+    || fail "an unhandled repost of an acknowledged request must read unhandled"
+
+  out=$(fm_pending_reply_inbox_status_report "$state" t1 "$corr_a" busy)
+  assert_contains "$out" "unhandled=2" "both waiting records must be counted"
+  assert_contains "$out" "corr_state=unhandled" "the asked correlation state must be reported"
+  assert_contains "$out" "composer=busy" "the given composer verdict must be reported"
+  printf '%s\n' "$out" | grep -Eq '^oldest_age=[0-9]+$' \
+    || fail "the oldest unhandled age must be a number of seconds: $out"
+  out=$(fm_pending_reply_inbox_status_report "$state" t1)
+  assert_not_contains "$out" "corr_state=" "no correlation asked means no correlation state"
+  pass "inbox status: schema, unhandled count and age, and the unhandled/handled/absent correlation states"
+}
+
+# A local mate has no unread escalation of its own here: the parent watcher's
+# re-ring ladder owns that, so the tracker must stay quiet however old it is.
+test_local_unread_request_raises_no_unread_escalation() {
+  local home state corr rec status
+  home=$(setup_parent local-unread)
+  state="$home/state"
+  status="$state/t1.status"
+  corr=$(FM_PENDING_REPLY_NOW=20000 fm_pending_reply_create "$home" "$state" t1 "local unread")
+  rec=$(fm_pending_reply_path "$state" "$corr")
+  FM_PENDING_REPLY_NOW=20000 fm_pending_reply_mark_delivered "$state" "$corr"
+  inbox_write "$state" t1 "[fm] corr=$corr local unread"
+
+  FM_PENDING_REPLY_NOW=29999 fm_pending_reply_idle_unread "$state" "$rec" \
+    || fail "an idle never-busy mate with an unhandled local request is not a completed turn"
+  [ ! -s "$status" ] || fail "a local mate must raise no unread escalation: $(cat "$status")"
+  [ -z "$(fm_pending_reply_get "$rec" unread_escalated_epoch)" ] \
+    || fail "a local mate must not record an unread escalation"
+
+  mv "$state/t1.inbox/001.msg" "$state/t1.inbox/handled/001.msg"
+  if FM_PENDING_REPLY_NOW=29999 fm_pending_reply_idle_unread "$state" "$rec"; then
+    fail "a handled local request makes the idle an ordinary completed turn"
+  fi
+  pass "a local mate's unread request raises no tracker escalation and a handled one counts as a turn"
+}
+
 # --- run --------------------------------------------------------------------
 
 test_normal_correlated_reply_resolves_once
@@ -2174,5 +2253,7 @@ test_local_parent_replies_is_wrong_home_evidence
 test_escalated_undelivered_correlation_stays_retryable
 test_same_kind_escalation_reopens_after_operator_close
 test_summary_keeps_accents_and_caps_by_character
+test_inbox_status_reports_unhandled_handled_and_absent
+test_local_unread_request_raises_no_unread_escalation
 
 printf 'ok - all pending-reply tests passed\n'

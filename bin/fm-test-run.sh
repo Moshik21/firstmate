@@ -827,7 +827,7 @@ tests/fm-on.test.sh 11473
 tests/fm-opencode-primary-live-e2e.test.sh 47
 tests/fm-operational-input.test.sh 2404
 tests/fm-peek-remote.test.sh 1082
-tests/fm-pending-reply.test.sh 41090
+tests/fm-pending-reply.test.sh 46200
 tests/fm-pi-branch-extension.test.sh 77218
 tests/fm-pi-branch-live-e2e.test.sh 48
 tests/fm-pi-branch-responsiveness-live-e2e.test.sh 12834
@@ -875,7 +875,7 @@ tests/fm-secondmate-sync.test.sh 55501
 tests/fm-send-agy-confirm.test.sh 4440
 tests/fm-send-inbox-doorbell-live-e2e.test.sh 108
 tests/fm-send-inbox.test.sh 41713
-tests/fm-send-remote-delivery.test.sh 31964
+tests/fm-send-remote-delivery.test.sh 55000
 tests/fm-send-resolve-key.test.sh 47317
 tests/fm-send-secondmate-marker-herdr-e2e.test.sh 80
 tests/fm-send-secondmate-marker.test.sh 7574
@@ -902,7 +902,7 @@ tests/fm-supervision-host-live-e2e.test.sh 75
 tests/fm-supervision-host.test.sh 1192918
 tests/fm-tangle-guard.test.sh 8501
 tests/fm-task-delivery.test.sh 32789
-tests/fm-task-inbox.test.sh 31965
+tests/fm-task-inbox.test.sh 35000
 tests/fm-tasks-axi.test.sh 2293
 tests/fm-teardown-endpoint-safety.test.sh 40851
 tests/fm-teardown.test.sh 202132
