@@ -1,0 +1,32 @@
+$ bin/fm-test-run.sh --list-lanes
+portable-parallel-1
+portable-parallel-2
+portable-serial
+portable-serial-1of9
+portable-serial-2of9
+portable-serial-3of9
+portable-serial-4of9
+portable-serial-5of9
+portable-serial-6of9
+portable-serial-7of9
+portable-serial-8of9
+portable-serial-9of9
+real-herdr-gated
+
+$ bin/fm-test-run.sh --list --lane portable-serial-10of10
+fm-test-run: lane 'portable-serial-10of10' asks for 10 portable serial shards but this runner is configured for 9 (see --list-lanes)
+exit=2
+$ bin/fm-test-run.sh --list --lane portable-serial-1of10
+fm-test-run: lane 'portable-serial-1of10' asks for 10 portable serial shards but this runner is configured for 9 (see --list-lanes)
+exit=2
+
+$ grep stop-park across 9 shard lanes
+fm-codex-stop-park.test.sh scheduled in portable-serial-6of9
+
+$ bin/fm-test-run.sh --check-coverage
+fm-test-run: coverage guard: largest portable serial shard packs 1202684ms above the 1200000ms target
+fm-test-run: refresh CI hints and rebalance or add shards; do not raise the job timeout: docs/fm-test-portable-shards.md
+exit=1
+
+$ CI matrix (parsed with python yaml)
+tests-portable-serial {'shard': [1, 2, 3, 4, 5, 6, 7, 8, 9]}

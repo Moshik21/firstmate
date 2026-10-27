@@ -1,0 +1,26 @@
+== opted-in lab home (config/codex-stop-park present), no verified codex ancestor ==
+codex-stop-park
+$ bin/fm-codex-stop-park.sh --capable
+exit=1
+Stop hook #2 async=true
+$ <async Stop hook command from .codex/hooks.json>
+
+real	0m0.314s
+user	0m0.133s
+sys	0m0.196s
+exit=0
+$ <sync Stop guard hook command from .codex/hooks.json>
+exit=0
+state after:
+
+== fallback-latched session, sync Stop guard ==
+Codex watcher park is in foreground fallback after a failure; inspect state/.codex-park.json and resume bounded foreground checkpoints.
+exit=2
+Codex watcher park is in foreground fallback after a failure; inspect state/.codex-park.json and resume bounded foreground checkpoints.
+exit(stop_hook_active=true)=0
+
+== opt-out: remove config/codex-stop-park ==
+$ bin/fm-codex-stop-park.sh --capable
+exit=1
+async exit=0
+guard exit=0

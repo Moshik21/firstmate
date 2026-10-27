@@ -1,0 +1,19 @@
+  >_ OpenAI Codex (v0.163.0)
+     /tmp/fm-lab-root.A4iWN7/fm
+› Ask Codex to do anything
+  Update available · 0.163.0 → 0.164.0
+  Release notes: https://github.com/openai/codex/releases/latest
+› 1. Update now (runs `npm install -g @openai/codex`)
+  2. Skip
+  3. Skip until next version
+  enter continue · esc skip
+  >_ OpenAI Codex (v0.163.0)
+     /tmp/fm-lab-root.A4iWN7/fm
+› Ask Codex to do anything
+  Folder access
+  /tmp/fm-lab-root.A4iWN7/fm
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings can run code automatically, even without a model request. Continue only if you
+  trust these files. Your trust decision will be saved.
+› 1. Trust and continue
+  2. Quit
+  enter continue · esc quit
