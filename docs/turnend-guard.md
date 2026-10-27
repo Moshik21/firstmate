@@ -306,8 +306,8 @@ The registrations in detail:
 
 Claude and Codex can block a Stop directly with exit status 2 and stderr.
 Both payloads carry `stop_hook_active`.
-In the foreground-checkpoint Codex fallback, a true value lets the second stop finish after one forced continuation.
-The verified native Codex park delegates its synchronous boundary to `bin/fm-codex-stop-park.sh --guard`, which accepts a live session-bound park or an immediate queued-wake handoff and otherwise falls back to this guard.
+In the default foreground-checkpoint Codex mode, a true value lets the second stop finish after one forced continuation.
+The tracked Codex Stop hook runs this guard through `bin/fm-codex-stop-park.sh --guard`, which adds behavior only for a native park session on a home that [opts in](configuration.md#codex-native-stop-park-configcodex-stop-park): it accepts a live session-bound park or an immediate queued-wake handoff and otherwise falls back to this guard.
 [The Codex protocol](supervision-protocols/codex.md) owns that mode and its failure behavior.
 
 ### Claude cooperative mode

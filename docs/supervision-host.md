@@ -72,7 +72,7 @@ The host's header owns the output contract they read.
 | OpenCode | the TUI plugin, `.opencode/plugins/fm-primary-watch-arm.js`, which restarts its own successor after each close | a `watcher` prompt through `ctx.session.prompt` |
 | omp | the watch extension, `.omp/extensions/fm-primary-omp-watch.ts`, which restarts its own successor after each close | the extension's `watcher` follow-up |
 | Grok | the model's tracked background call, rendered as `bin/fm-supervision-host.sh park` at session start | the background task's completion notification |
-| Codex | the native Stop park when verified, otherwise `bin/fm-watch-checkpoint.sh` | the native thread queue, otherwise checkpoint output; see [the Codex protocol](supervision-protocols/codex.md) |
+| Codex | the foreground checkpoint, `bin/fm-watch-checkpoint.sh`, or the native Stop park on a home that [opts in](configuration.md#codex-native-stop-park-configcodex-stop-park) | checkpoint output, or the native thread queue; see [the Codex protocol](supervision-protocols/codex.md) |
 
 Hook, plugin, extension, and checkpoint owners pass their harness as the primary pin.
 Grok's model-owned call relies on primary detection.
@@ -304,7 +304,7 @@ So it never stops the owner's host or watcher or releases its leases.
 ### A host that dies without a close
 
 The host's owner retries it.
-Grok's model and Codex's foreground fallback see it as a failed cycle and start the next one.
+Grok's model and Codex's checkpoint see it as a failed cycle and start the next one.
 The native Codex park reports the failure through its queue delivery and bounded retry owner.
 Before it arms, the next host does two things:
 
@@ -346,12 +346,12 @@ Acknowledged hand-back protects the boundary when the continuation is lost.
 
 ### Codex native park and checkpoint bound
 
-On the verified native Codex Stop-hook path, `FM_CODEX_MODEL_FREE_PARK=1` keeps the same watcher alive across quiet boundaries.
+On the opted-in native Codex Stop-hook path, `FM_CODEX_MODEL_FREE_PARK=1` keeps the same watcher alive across quiet boundaries.
 The host records `quiet-boundary` in its log and resets the boundary clock without creating a downtime generation or waking the model.
 Native thread-queue delivery wakes the model only for an actionable close; user input remains immediately available.
 Engine turns retain their own timeout, and the park's next-turn failure guard remains active.
 
-On the foreground fallback, the checkpoint's own bound is the park.
+On the foreground checkpoint, the checkpoint's own bound is the park.
 The checkpoint passes it as the boundary and reports the boundary as its ordinary quiet line (`checkpoint: no actionable wake within <n>s`).
 
 | Posture | Checkpoint bound |

@@ -257,7 +257,7 @@ Native stdout context injection is supported under `codex exec`.
 ### Codex interactive TUI
 
 The verified native version fires the tracked project `SessionStart` hook and delivers the ordered digest before the first model call.
-The transport delegates through `bin/fm-codex-stop-park.sh --session-start`, whose version and native-session receipt select the [Codex supervision protocol](supervision-protocols/codex.md).
+The transport delegates through `bin/fm-codex-stop-park.sh --session-start`, whose [opt-in](configuration.md#codex-native-stop-park-configcodex-stop-park), version, and native-session receipt select the [Codex supervision protocol](supervision-protocols/codex.md).
 Earlier versions where project hooks do not fire retain the uncovered behavior and manual session start.
 Firstmate ships no global hook and does not claim compaction, re-emit, or instruction-refresh delivery for this surface.
 

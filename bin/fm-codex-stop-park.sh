@@ -7,10 +7,15 @@
 # Usage: fm-codex-stop-park.sh --session-start|--guard|--capable
 #        fm-codex-stop-park.sh                 (asynchronous Stop hook)
 # Hook modes read the native JSON payload on stdin. --capable is read-only.
+# The park is opt-in: only a home with config/codex-stop-park
+# (docs/configuration.md owns it) registers or parks. Without it --session-start
+# only runs the session start, --guard only runs the turn-end guard, the
+# asynchronous Stop hook exits at once, and --capable fails.
 # Registration also requires the native transcript's codex-tui originator;
 # headless exec sessions have no persistent interactive input surface.
-# Unsupported versions, manual session starts, workers, and foreign session
-# owners retain the existing foreground checkpoint and turn-end guard.
+# Homes without the opt-in, unsupported versions, manual session starts,
+# workers, and foreign session owners retain the existing foreground
+# checkpoint and turn-end guard.
 #
 # state/.codex-park-session binds selection to the native session and fleet
 # lock PID. state/.codex-park.lock is the shared lock library's single-flight
@@ -62,6 +67,8 @@ OUT=
 OWNED=0
 CODEX_COMMAND=
 
+opted_in() { [ -f "$CONFIG/codex-stop-park" ]; }
+
 verified_cli() {
   local pid executable
   command -v jq >/dev/null 2>&1 || return 1
@@ -93,7 +100,7 @@ registered() {
 }
 
 capable() {
-  fm_primary_scope_matches "$FM_ROOT" "$STATE" && verified_cli \
+  opted_in && fm_primary_scope_matches "$FM_ROOT" "$STATE" && verified_cli \
     && fm_session_lock_owned_by_self "$STATE" || return 1
   # Only the native SessionStart wrapper supplies this before its receipt is
   # published; the digest has acquired the session lock before rendering.
@@ -156,7 +163,7 @@ case "$SESSION" in ''|*[!A-Za-z0-9-]*) SESSION= ;; esac
 
 if [ "$MODE" = --session-start ]; then
   transcript=$(printf '%s' "$PAYLOAD" | jq -r '.transcript_path // empty' 2>/dev/null)
-  if [ -n "$SESSION" ] && [ "$(cat "$FALLBACK" 2>/dev/null)" != "$SESSION" ] \
+  if [ -n "$SESSION" ] && opted_in && [ "$(cat "$FALLBACK" 2>/dev/null)" != "$SESSION" ] \
     && fm_primary_root_matches "$FM_ROOT" && verified_cli \
     && [ -f "$transcript" ] \
     && head -n 1 "$transcript" | jq -e --arg session "$SESSION" \
