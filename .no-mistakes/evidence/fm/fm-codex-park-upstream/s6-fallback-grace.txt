@@ -1,0 +1,7 @@
+# S6 adversarial: async hook cannot take claim (live foreign holder) -> sync guard waits out startup grace, latches foreground fallback, blocks Stop with exit 2
+Stop began: 2026-10-27T09:00:26.6Z (agent message 'pang' / token_count in rollout)
+Guard hook_prompt (stop block) delivered: 2026-10-27T09:00:44.97Z => ~18.3s elapsed on this macOS host for 50 x (sleep 0.2 + 2 jq forks); native Stop guard timeout in .codex/hooks.json is 30s
+--- state/.codex-park-fallback
+01a17c8f-5ac3-7222-b0a1-db3fad8da52c
+--- hook prompt text
+<hook_prompt hook_run_id="stop:3:/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.0oRK03/root/.codex/hooks.json">Codex watcher park failed to establish a live owner. Use the bounded foreground checkpoint protocol for this session; inspect state/.codex-park.json.</hook_prompt>

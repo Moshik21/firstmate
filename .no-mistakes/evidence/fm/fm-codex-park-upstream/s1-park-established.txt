@@ -1,0 +1,21 @@
+# S1: native codex-cli 0.163.0 TUI session registers and parks after first Stop
+codex-cli 0.163.0
+--- state/.codex-park-session
+01a17c8f-5ac3-7222-b0a1-db3fad8da52c
+88172
+--- state/.codex-park.json
+{
+  "session": "01a17c8f-5ac3-7222-b0a1-db3fad8da52c",
+  "identity": "Tue Oct 27 08:52:34 2026     bash /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.0oRK03/root/bin/fm-codex-stop-park.sh",
+  "anchor": "88172",
+  "pid": 21575,
+  "at": 1793091155,
+  "outcome": "waiting"
+}
+--- fallback latch present?
+ls: /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.0oRK03/state/.codex-park-fallback: No such file or directory
+--- lab process tree
+21575 88172 bash /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.0oRK03/root/bin/fm-codex-stop-park.sh
+23046 21575 perl -MPOSIX=WNOHANG,setpgid -MTime::HiRes=time -e \012      my ($bound, $grace, $owner, $shell_parent) = (shift, shift, shift, shift);\012      # e
+23091 23046 bash /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.0oRK03/root/bin/fm-watch-arm.sh
+23310 23091 bash /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.0oRK03/root/bin/fm-watch.sh

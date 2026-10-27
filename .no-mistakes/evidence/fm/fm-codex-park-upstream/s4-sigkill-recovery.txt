@@ -1,0 +1,50 @@
+# S4: SIGKILL of identity-verified lab park -> subtree self-expires; next turn gets recovery notice; park re-established
+(kill -9 of park pid 25448; 25s later no lab stop-park/watch processes remained; user msg 'pong' answered immediately; then recovery notice drained+acked; new park pid below)
+{"session":"01a17c8f-5ac3-7222-b0a1-db3fad8da52c","identity":"Tue Oct 27 08:58:41 2026     bash /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.0oRK03/root/bin/fm-codex-stop-park.sh","anchor":"88172","pid":10149,"at":1793091522,"outcome":"waiting"}
+› Reply with exactly: pong
+
+
+• pong
+
+  Worked for 3s • 1:58 AM
+
+
+› Firstmate Codex park recovered a dead or interrupted owner. Drain the durable wake queue and inspect state/.codex-
+  park.json; automatic supervision is restarting.
+
+
+• Ran bin/fm-wake-drain.sh
+  └ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation
+    99098.1793091510.AyLVxx
+
+• Captain, the wake queue is empty. I’ll inspect the park record and acknowledge the drain.
+
+• Explored
+  └ Read SKILL.md
+    Read .codex-park.json (exit 1)
+
+• Ran bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 99098.1793091510.AyLVxx
+  └ (no output)
+
+• Captain, the wake queue was empty and is acknowledged. state/.codex-park.json is absent, so I couldn’t inspect the
+  park record.
+
+  Worked for 12s • 1:58 AM
+
+
+› Firstmate watcher wake: check: rearm-resurface
+  Run bin/fm-wake-drain.sh first. Handle every presented wake, open decision and unread status, then run its exact
+  WAKE_ACK_REQUIRED command. The next Stop re-arms automatically; do not run a foreground checkpoint.
+
+
+• Ran bin/fm-wake-drain.sh
+  └ (no output)
+
+• Captain, the drain returned no wakes, open decisions, unread status, or acknowledgement command.
+
+  Worked for 6s • 1:58 AM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol low · /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.0oRK03/root · …  ⚠ 2 warnings · f2 to view

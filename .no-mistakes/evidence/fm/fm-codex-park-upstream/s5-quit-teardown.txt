@@ -1,0 +1,3 @@
+# S5: /quit of a healthy parked native 0.163.0 session tears down park, arm, and watcher
+before /quit: stop-park(20681), perl timeout wrapper(21784), fm-watch-arm(21808), fm-watch(21897) live
+20s after /quit: no lab processes remain

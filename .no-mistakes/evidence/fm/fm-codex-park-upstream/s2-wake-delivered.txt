@@ -1,0 +1,32 @@
+# S2: real custom-check event reaches model via native queue, park re-arms
+{
+  "session": "01a17c8f-5ac3-7222-b0a1-db3fad8da52c",
+  "identity": "Tue Oct 27 08:53:36 2026     bash /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.0oRK03/root/bin/fm-codex-stop-park.sh",
+  "anchor": "88172",
+  "pid": 25448,
+  "at": 1793091217,
+  "outcome": "waiting"
+}
+--- pane (codex 0.163.0 TUI)
+
+
+• Ran bin/fm-wake-drain.sh
+  └ 1793091189    1    check    /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.0oRK03/state/lab.check.sh
+    check: /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.0oRK03/state/lab.check.sh: LAB_REAL_EVENT
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation
+    +2 lines (⌃t to view transcript)
+
+• Captain, the drain presented only the smoke-test event, with no open decisions or unread status. I’ll acknowledge it
+  now.
+
+• Ran bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 23310.1793091189.fDcJN1
+  └ (no output)
+
+• Captain, the smoke-test wake is handled and acknowledged.
+
+  Worked for 15s • 1:53 AM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol low · /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.0oRK03/root · …  ⚠ 2 warnings · f2 to view
