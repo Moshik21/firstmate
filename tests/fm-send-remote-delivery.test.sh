@@ -137,12 +137,12 @@ while IFS= read -r -d '' a; do rargs+=("$a"); done \
 cmd=${rargs[0]}
 rc=0
 # FM_FAKE_SSH_FAIL_SUBCMD makes one host-local leg unreachable while the rest
-# of the transport answers, and FM_FAKE_SSH_USAGE_SUBCMD makes one leg answer
+# of the transport answers (or fail outright with FM_FAKE_SSH_FAIL_SUBCMD_RC), and FM_FAKE_SSH_USAGE_SUBCMD makes one leg answer
 # as a remote copy that does not have it. A mate that cannot take a turn has no herdr pane in
 # this fixture, so its busy/idle observation is the one thing the fixture
 # answers itself.
 if [ -n "${FM_FAKE_SSH_FAIL_SUBCMD:-}" ] && [ "${rargs[1]:-}" = "$FM_FAKE_SSH_FAIL_SUBCMD" ]; then
-  exit 255
+  exit "${FM_FAKE_SSH_FAIL_SUBCMD_RC:-255}"
 fi
 # A remote copy that predates a leg answers it with the script's usage text
 # and exit 2, and no schema line.
@@ -1130,6 +1130,50 @@ test_remote_failed_resend_is_never_repeated() {
   pass "fm-pending-reply remote: a resend that failed is never repeated"
 }
 
+# Scenario 3, definite failure: a resend the remote leg refuses outright keeps
+# the record tracked and escalates it as delivery-unknown.
+test_remote_definitely_failed_resend_stays_tracked_and_escalates() {
+  local dir fb ssh_log home rhome corr rec status open
+  dir="$TMP_ROOT/remote-resend-refused"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-resend-refused)
+  home=$(setup_remote_parent_home remote-resend-refused "$rhome")
+  corr=$(send_remote_request "$fb" "$home" "$ssh_log" 18000 "please append one line" FM_FAKE_SSH_RC=255)
+  rec=$(fm_pending_reply_path "$home/state" "$corr")
+  status="$home/state/rsm.status"
+  [ "$(fm_pending_reply_get "$rec" phase)" = delivery_unknown ] \
+    || fail "a send refused twice must be delivery_unknown: $(cat "$rec")"
+
+  # The first check reads the inbox, finds nothing, and the one resend is
+  # refused by the remote leg with a definite error.
+  tracker_pass "$fb" "$home" "$ssh_log" 18001 FM_FAKE_SSH_FAIL_SUBCMD=send FM_FAKE_SSH_FAIL_SUBCMD_RC=1
+  [ "$(fm_pending_reply_get "$rec" delivery_resend_epoch)" = 18001 ] \
+    || fail "the refused resend must still count as the one resend: $(cat "$rec")"
+  [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
+    || fail "a refused resend must not claim delivery: $(cat "$rec")"
+  [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 0 ] \
+    || fail "the refused resend must not have landed"
+  [ "$(fm_pending_reply_get "$rec" phase)" = escalated ] \
+    || fail "a refused resend must leave the record escalated, not orphaned: $(cat "$rec")"
+  [ "$(grep -c 'pending-reply-delivery-unknown' "$status" || true)" = 1 ] \
+    || fail "a refused resend must escalate as delivery-unknown: $(cat "$status" 2>/dev/null)"
+  open=$(status_open_decisions "$status" | cut -f1)
+  [ "$open" = "pending-reply-$corr" ] || fail "the delivery-unknown decision must be open, got '$open'"
+
+  # The next check still finds it absent and ends the checking without a
+  # second resend; the decision stays open for firstmate.
+  tracker_pass "$fb" "$home" "$ssh_log" 18700
+  [ "$(fm_pending_reply_get "$rec" delivery_reconcile)" = absent ] \
+    || fail "the next check must end the checking as absent: $(cat "$rec")"
+  [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 0 ] \
+    || fail "a record whose one resend was refused must not be resent again"
+  [ ! -e "$(fm_pending_reply_undelivered_text_path "$home/state" "$corr")" ] \
+    || fail "ending the checking must drop the stored text"
+  open=$(status_open_decisions "$status" | cut -f1)
+  [ "$open" = "pending-reply-$corr" ] || fail "the delivery-unknown decision must stay open, got '$open'"
+  pass "fm-pending-reply remote: a resend refused outright stays tracked and escalates as delivery-unknown"
+}
+
 # Review finding on the finding-2 fix: a failed read must be retried soon, but
 # not on every watcher pass.
 test_remote_failed_inbox_read_retries_after_the_short_backoff_only() {
@@ -1309,6 +1353,7 @@ test_remote_landed_reconciliation_closes_the_delivery_unknown_decision
 test_remote_unlanded_record_is_resent_once_and_recheck_is_not_delayed_by_a_failed_read
 test_remote_undelivered_check_honours_spacing_text_and_age_limits
 test_remote_failed_resend_is_never_repeated
+test_remote_definitely_failed_resend_stays_tracked_and_escalates
 test_remote_failed_inbox_read_retries_after_the_short_backoff_only
 test_remote_copy_without_the_inbox_status_leg_is_probed_at_the_short_spacing
 test_remote_silent_host_cannot_hold_the_tracker_past_the_read_budget

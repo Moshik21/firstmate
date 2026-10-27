@@ -1687,11 +1687,20 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
   fm_pending_reply_set "$rec" delivery_resend_epoch "$now" || return 1
   fm_pending_reply_set "$rec" delivery_reconcile resent || return 1
   # fm-send owns the outcome: success confirms delivery on the record, and an
-  # unknown transport marks it delivery_unknown again for the next check.
+  # unknown transport marks it delivery_unknown again for the next check. A
+  # definite failure leaves it awaiting_report with no marker, which is
+  # returned to delivery_unknown so the record stays tracked and escalates.
   env FM_HOME="$parent_home" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$_FM_PENDING_REPLY_LIB_DIR/fm-send.sh" "$task_id" "$text" >/dev/null 2>&1 || true
-  [ -n "$(fm_pending_reply_get "$rec" delivered_epoch)" ] || return 0
   fm_lock_acquire_wait "$lock" || return 1
+  if [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ]; then
+    if [ "$(fm_pending_reply_get "$rec" phase)" = awaiting_report ] \
+      && [ ! -e "$(fm_pending_reply_delivery_confirmation_path "$state" "$corr")" ]; then
+      fm_pending_reply_set "$rec" phase delivery_unknown || rc=$?
+    fi
+    fm_lock_release "$lock"
+    return "$rc"
+  fi
   _fm_pending_reply_close_open_escalation_locked "$rec" "$corr" \
     "delivery-reconciled resent" || rc=$?
   fm_lock_release "$lock"
