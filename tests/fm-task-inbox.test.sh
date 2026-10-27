@@ -1291,8 +1291,8 @@ test_parent_inbox_tick_wakes_a_parked_mate_once_per_oldest_record() {
   touch -d '101 seconds ago' "$first"
   parent_tick "$home" "$wakes"
   [ "$(wc -l < "$wakes" | tr -d ' ')" = 1 ] || fail "an aged record must wake the mate once: $(cat "$wakes")"
-  assert_contains "$(cat "$wakes")" "check: parent instruction waiting: 1 unhandled in $inbox, oldest 101s" \
-    "the wake must name the count, the inbox and the oldest age"
+  assert_contains "$(cat "$wakes")" "check: parent instruction waiting: 1 unhandled in $inbox, oldest 10" \
+    "the wake must name the count, the inbox and the oldest age (101 s, give or take the second boundary)"
   queue=$(cat "$state/.wake-queue")
   case "$queue" in
     *"	check	parent-inbox-rsm-001	check: parent instruction waiting: 1 unhandled"*) : ;;

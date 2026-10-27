@@ -75,6 +75,9 @@
 #   unread_escalated_epoch= when that one unread escalation was raised
 #   delivery_checked_epoch= last undelivered-record inbox check that got an answer
 #                           (throttle; a failed read does not set it)
+#   delivery_read_failed_epoch= when the last inbox read of an undelivered record
+#                           failed; the next read waits the short read-retry
+#                           spacing from it, and a read that answers clears it
 #   delivery_reconcile=     landed | resent | absent once an undelivered record
 #                           was checked against the mate's inbox; landed and
 #                           absent end the checking
@@ -109,7 +112,13 @@
 #     delivery-unknown decision is closed with the via=delivery-reconciled
 #     note; the request itself keeps waiting for its correlated report.
 # An inbox read that fails (an unreachable host, or a remote copy without the
-# inbox-status leg) changes nothing: the tracker keeps its prior behavior.
+# inbox-status leg) changes nothing about the record's delivery state, and it
+# does not start the long recheck spacing: the next read of that record waits
+# only FM_PENDING_REPLY_DELIVERY_READ_RETRY_SECS from the failure, so a host
+# that is back is found promptly while a down or incapable one is not dialed on
+# every watcher pass. Every remote inbox read is also bounded to
+# FM_PENDING_REPLY_INBOX_READ_BUDGET seconds so a silent host cannot hold the
+# watcher.
 # These helpers read the inbox through bin/fm-task-inbox-lib.sh, sourced on
 # first use when the caller has not already loaded it.
 #
@@ -162,6 +171,10 @@
 #   FM_PENDING_REPLY_UNREAD_SECS  default 300; remote unread-escalation age
 #   FM_PENDING_REPLY_DELIVERY_RECHECK_SECS default 600; undelivered inbox check
 #                                 spacing per record
+#   FM_PENDING_REPLY_DELIVERY_READ_RETRY_SECS default 60; spacing between reads
+#                                 of one undelivered record after a failed read
+#   FM_PENDING_REPLY_INBOX_READ_BUDGET default 30; hard bound in seconds on one
+#                                 remote inbox-status ssh round trip
 #   FM_PENDING_REPLY_RESEND_MAX_AGE_SECS default 7200; oldest request the one
 #                                 automatic undelivered resend may repeat
 
@@ -189,6 +202,8 @@ FM_PENDING_REPLY_GRACE_DEFAULT=120
 FM_PENDING_REPLY_UNREAD_DEFAULT=300
 FM_PENDING_REPLY_DELIVERY_RECHECK_DEFAULT=600
 FM_PENDING_REPLY_RESEND_MAX_AGE_DEFAULT=7200
+FM_PENDING_REPLY_DELIVERY_READ_RETRY_DEFAULT=60
+FM_PENDING_REPLY_INBOX_READ_BUDGET_DEFAULT=30
 
 fm_pending_reply_now() {
   if [ -n "${FM_PENDING_REPLY_NOW:-}" ]; then
@@ -1511,7 +1526,12 @@ EOF
 fm_pending_reply_inbox_status() {  # <state-dir> <task_id> <corr_id>
   local out
   if fm_pending_reply_target_is_remote "$1" "$2"; then
-    out=$("$_FM_PENDING_REPLY_LIB_DIR/fm-on.sh" "$2" \
+    local budget
+    budget=$(fm_pending_reply_tunable "${FM_PENDING_REPLY_INBOX_READ_BUDGET:-}" "$FM_PENDING_REPLY_INBOX_READ_BUDGET_DEFAULT")
+    [ "$budget" -gt 0 ] || budget=$FM_PENDING_REPLY_INBOX_READ_BUDGET_DEFAULT
+    # Bounded here, not in fm-on.sh: only the tracker's reads must never hold
+    # the watcher, and fm-send already bounds its own legs the same way.
+    out=$(fm_run_timed "$budget" "$_FM_PENDING_REPLY_LIB_DIR/fm-on.sh" "$2" \
       fm-remote-secondmate-control.sh inbox-status "$2" "$3" < /dev/null 2>/dev/null) || return 1
     case "$out" in schema=fm-inbox-status.v1*) ;; *) return 1 ;; esac
     printf '%s\n' "$out"
@@ -1608,7 +1628,7 @@ _fm_pending_reply_escalate_unread_locked() {  # <state-dir> <corr_id> <age-secs>
 # inbox reconciliation note). Returns 0 only after it changed the record.
 fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
   local state=$1 corr=$2 rec phase task_id checked now recheck status corr_state text_path
-  local created max_age lock rc=0 parent_home text
+  local created max_age lock rc=0 parent_home text failed read_retry
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   rec=$(fm_pending_reply_path "$state" "$corr")
   [ -f "$rec" ] || return 1
@@ -1620,10 +1640,19 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
   checked=$(fm_pending_reply_get "$rec" delivery_checked_epoch)
   recheck=$(fm_pending_reply_tunable "${FM_PENDING_REPLY_DELIVERY_RECHECK_SECS:-}" "$FM_PENDING_REPLY_DELIVERY_RECHECK_DEFAULT")
   case "$checked" in ''|*[!0-9]*) ;; *) [ $((now - checked)) -ge "$recheck" ] || return 1 ;; esac
+  failed=$(fm_pending_reply_get "$rec" delivery_read_failed_epoch)
+  read_retry=$(fm_pending_reply_tunable "${FM_PENDING_REPLY_DELIVERY_READ_RETRY_SECS:-}" "$FM_PENDING_REPLY_DELIVERY_READ_RETRY_DEFAULT")
+  case "$failed" in ''|*[!0-9]*) ;; *) [ $((now - failed)) -ge "$read_retry" ] || return 1 ;; esac
   task_id=$(fm_pending_reply_get "$rec" task_id)
-  # Only a read that answered counts as a check: a failed one (host down) must
-  # not hold the next attempt back for the full recheck spacing.
-  status=$(fm_pending_reply_inbox_status "$state" "$task_id" "$corr") || return 1
+  # Only a read that answered counts as a check, so a failed one (host down) is
+  # retried after the short read-retry spacing rather than the full recheck
+  # spacing - and not on every pass, which would dial a down or incapable host
+  # at the watcher's poll rate.
+  if ! status=$(fm_pending_reply_inbox_status "$state" "$task_id" "$corr"); then
+    fm_pending_reply_set "$rec" delivery_read_failed_epoch "$now" || true
+    return 1
+  fi
+  [ -z "$failed" ] || fm_pending_reply_set "$rec" delivery_read_failed_epoch "" || true
   fm_pending_reply_set "$rec" delivery_checked_epoch "$now" || return 1
   corr_state=$(fm_pending_reply_inbox_field "$status" corr_state)
   text_path=$(fm_pending_reply_undelivered_text_path "$state" "$corr")

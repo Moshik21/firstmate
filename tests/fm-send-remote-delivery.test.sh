@@ -137,11 +137,18 @@ while IFS= read -r -d '' a; do rargs+=("$a"); done \
 cmd=${rargs[0]}
 rc=0
 # FM_FAKE_SSH_FAIL_SUBCMD makes one host-local leg unreachable while the rest
-# of the transport answers. A mate that cannot take a turn has no herdr pane in
+# of the transport answers, and FM_FAKE_SSH_USAGE_SUBCMD makes one leg answer
+# as a remote copy that does not have it. A mate that cannot take a turn has no herdr pane in
 # this fixture, so its busy/idle observation is the one thing the fixture
 # answers itself.
 if [ -n "${FM_FAKE_SSH_FAIL_SUBCMD:-}" ] && [ "${rargs[1]:-}" = "$FM_FAKE_SSH_FAIL_SUBCMD" ]; then
   exit 255
+fi
+# A remote copy that predates a leg answers it with the script's usage text
+# and exit 2, and no schema line.
+if [ -n "${FM_FAKE_SSH_USAGE_SUBCMD:-}" ] && [ "${rargs[1]:-}" = "$FM_FAKE_SSH_USAGE_SUBCMD" ]; then
+  printf 'fm-remote-secondmate-control.sh <command> ...\n'
+  exit 2
 fi
 if [ -n "${FM_FAKE_SSH_OBSERVE:-}" ] && [ "${rargs[0]}" = fm-remote-secondmate-control.sh ] \
   && [ "${rargs[1]:-}" = observe ]; then
@@ -976,7 +983,7 @@ test_remote_landed_reconciliation_closes_the_delivery_unknown_decision() {
   open=$(status_open_decisions "$status" | cut -f1)
   [ "$open" = "pending-reply-$corr" ] || fail "the delivery-unknown decision must be open, got '$open'"
 
-  tracker_pass "$fb" "$home" "$ssh_log" 11020
+  tracker_pass "$fb" "$home" "$ssh_log" 11070
   [ "$(fm_pending_reply_get "$rec" delivery_reconcile)" = landed ] \
     || fail "the reachable host must reconcile the record as landed: $(cat "$rec")"
   [ -z "$(status_open_decisions "$status")" ] \
@@ -1010,15 +1017,17 @@ test_remote_unlanded_record_is_resent_once_and_recheck_is_not_delayed_by_a_faile
     || fail "an unreadable inbox must leave the delivery-unknown escalation: $(cat "$rec")"
   [ -z "$(fm_pending_reply_get "$rec" delivery_checked_epoch)" ] \
     || fail "a failed inbox read must not count as a check: $(cat "$rec")"
+  [ "$(fm_pending_reply_get "$rec" delivery_read_failed_epoch)" = 12040 ] \
+    || fail "a failed inbox read must be recorded for the short backoff: $(cat "$rec")"
   [ "$(grep -c 'pending-reply-delivery-unknown' "$status" || true)" = 1 ] \
     || fail "expected one delivery-unknown escalation: $(cat "$status")"
   [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 0 ] \
     || fail "an unreadable inbox must not trigger a resend"
 
-  # One second later the host is back: far inside the 600 s spacing, the next
-  # pass reads the inbox, finds the record absent, and resends it once under
-  # the same correlation.
-  tracker_pass "$fb" "$home" "$ssh_log" 12041
+  # The host is back and the short read-retry spacing (60 s) has passed - far
+  # inside the 600 s recheck spacing: the next pass reads the inbox, finds the
+  # record absent, and resends it once under the same correlation.
+  tracker_pass "$fb" "$home" "$ssh_log" 12100
   count=$(remote_inbox_records "$rhome" | grep -c . || true)
   [ "$count" = 1 ] || fail "the reachable host must receive exactly one resend, found $count records"
   grep -qF "corr=$corr" "$(remote_inbox_records "$rhome" | head -1)" \
@@ -1026,7 +1035,7 @@ test_remote_unlanded_record_is_resent_once_and_recheck_is_not_delayed_by_a_faile
   [ "$(fm_pending_reply_get "$rec" delivery_reconcile)" = resent ] \
     || fail "the reconciliation must be recorded as resent: $(cat "$rec")"
   resend_epoch=$(fm_pending_reply_get "$rec" delivery_resend_epoch)
-  [ "$resend_epoch" = 12041 ] || fail "the resend epoch was not recorded: $(cat "$rec")"
+  [ "$resend_epoch" = 12100 ] || fail "the resend epoch was not recorded: $(cat "$rec")"
   [ -n "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
     || fail "a resend that lands must confirm delivery: $(cat "$rec")"
   [ "$(fm_pending_reply_get "$rec" phase)" = awaiting_report ] \
@@ -1119,6 +1128,91 @@ test_remote_failed_resend_is_never_repeated() {
   [ "$(fm_pending_reply_get "$rec" delivery_reconcile)" = absent ] \
     || fail "the second check must end the checking as absent: $(cat "$rec")"
   pass "fm-pending-reply remote: a resend that failed is never repeated"
+}
+
+# Review finding on the finding-2 fix: a failed read must be retried soon, but
+# not on every watcher pass.
+test_remote_failed_inbox_read_retries_after_the_short_backoff_only() {
+  local dir fb ssh_log home rhome corr rec before
+  dir="$TMP_ROOT/remote-read-backoff"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-read-backoff)
+  home=$(setup_remote_parent_home remote-read-backoff "$rhome")
+  corr=$(send_remote_request "$fb" "$home" "$ssh_log" 18000 "please append one line" FM_FAKE_SSH_RC=255)
+  rec=$(fm_pending_reply_path "$home/state" "$corr")
+
+  tracker_pass "$fb" "$home" "$ssh_log" 18010 FM_FAKE_SSH_RC=255
+  [ "$(fm_pending_reply_get "$rec" delivery_read_failed_epoch)" = 18010 ] \
+    || fail "a failed read must record when it failed: $(cat "$rec")"
+
+  # The host is back, but the watcher passes inside the backoff do not read.
+  before=$(cat "$ssh_log.count")
+  tracker_pass "$fb" "$home" "$ssh_log" 18025
+  tracker_pass "$fb" "$home" "$ssh_log" 18069
+  [ "$(cat "$ssh_log.count")" = "$before" ] \
+    || fail "a pass inside the read-retry backoff must not touch the host"
+  [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 0 ] \
+    || fail "a pass inside the backoff must not resend"
+
+  # At the end of the backoff the read happens, the record is found absent, and
+  # the answered read clears the failure.
+  tracker_pass "$fb" "$home" "$ssh_log" 18070
+  [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 1 ] \
+    || fail "the first pass after the backoff must read the inbox and resend"
+  [ -z "$(fm_pending_reply_get "$rec" delivery_read_failed_epoch)" ] \
+    || fail "an answered read must clear the recorded failure: $(cat "$rec")"
+  [ "$(fm_pending_reply_get "$rec" delivery_checked_epoch)" = 18070 ] \
+    || fail "an answered read is a check: $(cat "$rec")"
+  pass "fm-pending-reply remote: a failed inbox read is retried after the short backoff and not before"
+}
+
+# A remote copy without the inbox-status leg answers every read with a usage
+# error: it is probed at the short spacing, not on every pass.
+test_remote_copy_without_the_inbox_status_leg_is_probed_at_the_short_spacing() {
+  local dir fb ssh_log home rhome corr rec before pass_epoch
+  dir="$TMP_ROOT/remote-no-leg"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-no-leg)
+  home=$(setup_remote_parent_home remote-no-leg "$rhome")
+  corr=$(send_remote_request "$fb" "$home" "$ssh_log" 19000 "please append one line" FM_FAKE_SSH_RC=255)
+  rec=$(fm_pending_reply_path "$home/state" "$corr")
+
+  before=$(cat "$ssh_log.count")
+  for pass_epoch in 19010 19025 19040 19055; do
+    tracker_pass "$fb" "$home" "$ssh_log" "$pass_epoch" FM_FAKE_SSH_USAGE_SUBCMD=inbox-status
+  done
+  [ "$(( $(cat "$ssh_log.count") - before ))" = 1 ] \
+    || fail "four watcher passes inside 60 s must make one probe, made $(( $(cat "$ssh_log.count") - before ))"
+  tracker_pass "$fb" "$home" "$ssh_log" 19070 FM_FAKE_SSH_USAGE_SUBCMD=inbox-status
+  [ "$(( $(cat "$ssh_log.count") - before ))" = 2 ] \
+    || fail "the pass after the spacing must probe again"
+  [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
+    || fail "a usage error must never claim delivery: $(cat "$rec")"
+  [ -z "$(fm_pending_reply_get "$rec" delivery_checked_epoch)" ] \
+    || fail "a usage error is not an answered read: $(cat "$rec")"
+  [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 0 ] \
+    || fail "a usage error must not trigger a resend"
+  pass "fm-pending-reply remote: a remote copy without the inbox-status leg is probed at the short spacing"
+}
+
+# A host that accepts the connection and then says nothing cannot hold the
+# watcher past the read budget.
+test_remote_silent_host_cannot_hold_the_tracker_past_the_read_budget() {
+  local dir fb ssh_log home rhome corr rec start elapsed
+  dir="$TMP_ROOT/remote-read-budget"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-read-budget)
+  home=$(setup_remote_parent_home remote-read-budget "$rhome")
+  corr=$(send_remote_request "$fb" "$home" "$ssh_log" 20000 "please append one line" FM_FAKE_SSH_RC=255)
+  rec=$(fm_pending_reply_path "$home/state" "$corr")
+
+  start=$SECONDS
+  tracker_pass "$fb" "$home" "$ssh_log" 20010 FM_FAKE_SSH_HANG=25 FM_PENDING_REPLY_INBOX_READ_BUDGET=1
+  elapsed=$((SECONDS - start))
+  [ "$elapsed" -lt 15 ] || fail "a silent host held the tracker for ${elapsed}s despite a 1 s read budget"
+  [ "$(fm_pending_reply_get "$rec" delivery_read_failed_epoch)" = 20010 ] \
+    || fail "a read that hit its budget is a failed read: $(cat "$rec")"
+  pass "fm-pending-reply remote: a silent host is cut off at the inbox read budget"
 }
 
 # Scenario 4: the resend is a real record in the mate's inbox; once the mate
@@ -1215,6 +1309,9 @@ test_remote_landed_reconciliation_closes_the_delivery_unknown_decision
 test_remote_unlanded_record_is_resent_once_and_recheck_is_not_delayed_by_a_failed_read
 test_remote_undelivered_check_honours_spacing_text_and_age_limits
 test_remote_failed_resend_is_never_repeated
+test_remote_failed_inbox_read_retries_after_the_short_backoff_only
+test_remote_copy_without_the_inbox_status_leg_is_probed_at_the_short_spacing
+test_remote_silent_host_cannot_hold_the_tracker_past_the_read_budget
 test_remote_resend_lands_and_acknowledgement_resolves_the_record
 test_remote_inbox_status_leg_reports_states_and_rejects_bad_corr
 
