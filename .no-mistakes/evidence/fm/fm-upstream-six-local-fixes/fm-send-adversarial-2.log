@@ -1,0 +1,29 @@
+=== H: nonexistent-window mate (genuine send failure) + plain steer + open calls
+1:window=sess:fm-gone
+rc=0
+stderr (first line first):
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+notice: domain has open captain call(s) in this home's ledger (captain-hold-call-a-1 captain-hold-call-b-1) and this send carries no --resolve-key, so it closes none of them; if it answers one, send the answer with --resolve-key <key> so the call closes without waiting for the mate's next turn.
+fm-send: doorbell not typed because the agent in sess:fm-gone has exited; the steer is durably recorded at /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.LNAfdK/adv2-parent-16153/state/domain.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+=== E2: marker mismatch -> notice, rc 0, hold untouched
+rc=0
+notice: the answer was delivered to domain, but its home is not recorded as a seeded secondmate home, so its held call(s) were not closed here; the mate closes them when it reads the answer. Do not resend.
+  state: queued
+=== F2: fire-and-forget to mate with open calls stays quiet
+rc=0
+stderr:[0 notices]
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-send: doorbell not typed because the agent in sess:fm-domain has exited; the steer is durably recorded at /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.LNAfdK/adv2-parent-16153/state/domain.inbox/003.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+=== G2: keyed answer for call-b closes once; call-a still open
+rc=0
+notices: 0
+call-a
+  state: queued
+call-b
+  state: done

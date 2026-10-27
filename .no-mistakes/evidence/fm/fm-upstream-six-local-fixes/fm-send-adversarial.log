@@ -1,0 +1,35 @@
+=== B: failed transport (tmux send-keys fails) + plain steer, open mate calls
+rc=0
+stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+notice: domain has open captain call(s) in this home's ledger (captain-hold-call-a-1 captain-hold-call-b-1) and this send carries no --resolve-key, so it closes none of them; if it answers one, send the answer with --resolve-key <key> so the call closes without waiting for the mate's next turn.
+fm-send: doorbell not typed because the agent in sess:fm-domain has exited; the steer is durably recorded at /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.Etdwh7/adv-parent-11720/state/domain.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+=== C: failed transport + keyed answer: hold must stay open
+rc=0
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-send: doorbell not typed because the agent in sess:fm-domain has exited; the steer is durably recorded at /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.Etdwh7/adv-parent-11720/state/domain.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+  state: done
+=== D: steer to ordinary crewmate with no mate calls -> no notice
+rc=0
+stderr:[WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.]
+=== E: seeded-marker mismatch -> notice, rc 0, hold untouched
+rc=1
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --resolve-key 'captain-hold-call-a-1': no open decision or blocker with that key in /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.Etdwh7/adv-parent-11720/state/domain.status, and no captain-held task 'captain-hold-call-a-1' or 'domain-decision-captain-hold-call-a-1' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.
+  state: done
+=== F: fire-and-forget to mate with open calls stays quiet
+rc=1
+stderr:[WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: target '--fire-and-forget' is not resolvable (tried meta=/private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.Etdwh7/adv-parent-11720/state/--fire-and-forget.meta; metadata window/terminal lookup; backend=none). Use fm---fire-and-forget for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.]
+=== G: correct keyed answer after the above closes once
+rc=1
+stderr:[WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: --resolve-key 'captain-hold-call-a-1': no open decision or blocker with that key in /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-send-resolve-key.Etdwh7/adv-parent-11720/state/domain.status, and no captain-held task 'captain-hold-call-a-1' or 'domain-decision-captain-hold-call-a-1' still open (already closed or mistyped). Re-check the OPEN DECISIONS listing, then resend without that key or with the right one; nothing was sent.]
+  state: done
+  state: queued
