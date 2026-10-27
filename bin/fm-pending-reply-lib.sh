@@ -73,7 +73,8 @@
 #                           recovery), never from delivery or send time
 #   unread_detail=          the inbox facts an unread escalation reported
 #   unread_escalated_epoch= when that one unread escalation was raised
-#   delivery_checked_epoch= last undelivered-record inbox check (throttle)
+#   delivery_checked_epoch= last undelivered-record inbox check that got an answer
+#                           (throttle; a failed read does not set it)
 #   delivery_reconcile=     landed | resent | absent once an undelivered record
 #                           was checked against the mate's inbox; landed and
 #                           absent end the checking
@@ -1619,9 +1620,11 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
   checked=$(fm_pending_reply_get "$rec" delivery_checked_epoch)
   recheck=$(fm_pending_reply_tunable "${FM_PENDING_REPLY_DELIVERY_RECHECK_SECS:-}" "$FM_PENDING_REPLY_DELIVERY_RECHECK_DEFAULT")
   case "$checked" in ''|*[!0-9]*) ;; *) [ $((now - checked)) -ge "$recheck" ] || return 1 ;; esac
-  fm_pending_reply_set "$rec" delivery_checked_epoch "$now" || return 1
   task_id=$(fm_pending_reply_get "$rec" task_id)
+  # Only a read that answered counts as a check: a failed one (host down) must
+  # not hold the next attempt back for the full recheck spacing.
   status=$(fm_pending_reply_inbox_status "$state" "$task_id" "$corr") || return 1
+  fm_pending_reply_set "$rec" delivery_checked_epoch "$now" || return 1
   corr_state=$(fm_pending_reply_inbox_field "$status" corr_state)
   text_path=$(fm_pending_reply_undelivered_text_path "$state" "$corr")
   STATE=$state
