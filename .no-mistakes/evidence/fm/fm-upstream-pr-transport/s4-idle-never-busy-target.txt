@@ -1,0 +1,3 @@
+/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.BvKEoo/s4.sh: line 6: tmux: command not found
+[target] t=1200 phase=awaiting_report turn_completed='' recovery_attempted='' escalated=''
+[target] t=1400 phase=awaiting_report turn_completed='' recovery_attempted='' escalated=''

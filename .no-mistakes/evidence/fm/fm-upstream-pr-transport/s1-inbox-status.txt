@@ -1,0 +1,26 @@
+--- unhandled record, matching corr
+schema=fm-inbox-status.v1
+unhandled=1
+oldest_age=6
+corr_state=unhandled
+composer=unknown
+--- unhandled record, other corr
+schema=fm-inbox-status.v1
+unhandled=1
+oldest_age=6
+corr_state=absent
+composer=unknown
+--- no corr
+schema=fm-inbox-status.v1
+unhandled=1
+oldest_age=7
+composer=unknown
+--- invalid corr
+error: invalid correlation id: zz
+rc=1
+--- move record to handled
+schema=fm-inbox-status.v1
+unhandled=0
+oldest_age=
+corr_state=handled
+composer=unknown

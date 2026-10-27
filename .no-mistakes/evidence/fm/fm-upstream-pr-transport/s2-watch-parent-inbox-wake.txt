@@ -1,0 +1,9 @@
+queue before:
+(none)
+queue after 9s:
+(none)
+marker: 
+--- watcher output
+check: parent instruction waiting: 1 unhandled in /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.BvKEoo/state/parent-route/mate1.inbox, oldest 8s; read and act on each in numeric order, then mv each into its handled/
+--- queue entries count for key:
+1

@@ -1,0 +1,14 @@
+ws json keys: {"w":"w1","t":"w1:t1","p":{"agent_status":"unknown","cwd":"/private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.BvKEoo/claudecwd","focused":true,"foreground_cwd":"/private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-lab.BvKEoo/claudecwd","pane_id":"w1:p1","revision":0,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":40},"tab_id":"w1:t1","terminal_id":"t
+=== R5: delivery_unknown, never landed, fresh stored text -> exactly one automatic same-correlation resend
+  before phase=delivery_unknown delivered='' reconcile='' resend=''
+  t=1100 phase=awaiting_report delivered='' reconcile='resent' resend='1100'
+  fm-on calls:
+    fm-on mate1 fm-remote-secondmate-control.sh inbox-status mate1 cb49ae68fb31d2ff
+      leg rc=0
+    fm-on mate1 fm-remote-secondmate-control.sh send mate1 [fm-from-firstmate]⁣corr=cb49ae68fb31d2ff please do V
+      leg rc=1
+  mate inbox now:
+  t=1800 phase=awaiting_report delivered='' reconcile='resent' resend='1100'
+  t=2500 phase=awaiting_report delivered='' reconcile='resent' resend='1100'
+  mate inbox record count (must stay 1; no second resend): 0
+  stored text still present: yes

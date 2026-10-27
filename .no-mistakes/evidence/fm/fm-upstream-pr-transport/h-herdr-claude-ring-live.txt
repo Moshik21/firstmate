@@ -1,0 +1,59 @@
+claude 2.1.311 (Claude Code); herdr herdr 0.9.0; session=fm-lab-ringlive-80187-23021
+claude idle
+
+=== H1: composer holds OUR OWN typed-but-unsubmitted doorbell (the incident shape)
+composer state before ring: empty
+  each in numeric order, then mv each into its handled/.
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+ring rc=0
+-- pane after ring:
+❯ : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'mate1.inbox' steering inbox, read and act on
+  each in numeric order, then mv each into its handled/.
+✻ Flambéing… (9s · thinking with high effort)
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt
+-- ring-log:
+2026-10-27T01:50:11Z	001.msg	rang	composer=own-doorbell submitted
+
+=== H2: operator's own different single-line draft is NOT submitted
+ring rc=1 (expect 1)
+-- pane after ring (draft must still be sitting unsent):
+❯ my unsent operator draft about lunch
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+-- ring-log:
+2026-10-27T01:50:45Z	001.msg	skipped:other-text	composer=pending
+
+=== H3: operator's multi-line paste draft (placeholder-only) is NOT read as our doorbell
+-- pane before ring:
+  operator note line4
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+ring rc=1 (expect 1)
+-- pane after ring (draft must be unsent):
+  operator note line4
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+-- agent status: idle
+-- ring-log:
+2026-10-27T01:51:07Z	001.msg	skipped:other-text	composer=pending
+
+=== H4: empty composer -> ring types + submits
+composer state: pending
+ring rc=1
+  operator note line2
+  operator note line3
+  operator note line4
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+-- ring-log:
+2026-10-27T01:51:15Z	001.msg	skipped:other-text	composer=pending

@@ -1,0 +1,37 @@
+claude 2.1.311 (Claude Code); herdr herdr 0.9.0; session=fm-lab-ringlive-94870-28832
+claude idle
+
+=== H3b: operator's large multi-line paste (collapses to a [Pasted text] placeholder) is NOT read as our doorbell
+-- pane before ring:
+❯ with some padding text to make this a sizeable block of text
+  operator paste line 14 with some padding text to make this a sizeable block of text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  paste again to expand
+herdr composer content: with some padding text to make this a sizeable block of text operator paste line 14 with some padding text to make this 
+ring rc=1 (expect 1)
+-- pane after ring:
+❯ with some padding text to make this a sizeable block of text
+  operator paste line 14 with some padding text to make this a sizeable block of text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+-- agent status: idle (expect idle: draft not submitted)
+-- ring-log:
+2026-10-27T01:52:07Z	002.msg	skipped:other-text	composer=pending
+composer after clear: pending
+  operator paste line 14 with some padding text to make this a sizeable block of text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+
+=== H4: empty composer -> ring types + submits
+ring rc=1
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ with some padding text to make this a sizeable block of text
+  operator paste line 14 with some padding text to make this a sizeable block of text
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+-- ring-log:
+2026-10-27T01:52:15Z	002.msg	skipped:other-text	composer=pending

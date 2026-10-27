@@ -1,0 +1,8 @@
+== second watcher run, same oldest record (expect no second queue entry)
+queue entries: 1
+watcher out: 
+== ack: move record to handled -> marker cleared
+marker after ack: ''
+== a new instruction -> wakes again with the new key
+1793065425	1	check	parent-inbox-mate1-001	check: parent instruction waiting: 1 unhandled in /var/folders/zg/kfkfp61x11v1
+1793065490	2	check	parent-inbox-mate1-002	check: parent instruction waiting: 1 unhandled in /var/folders/zg/kfkfp61x11v1

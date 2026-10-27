@@ -1,0 +1,34 @@
+=== R1: remote mate idle-never-busy, record unread -> ONE pending-reply-unread escalation after 300s
+  t=1100 phase=awaiting_report delivered='1000' completed='' unread_esc='' reconcile='' resend=''
+  t=1400 phase=awaiting_report delivered='1000' completed='' unread_esc='1400' reconcile='' resend=''
+  t=1500 phase=awaiting_report delivered='1000' completed='' unread_esc='1400' reconcile='' resend=''
+  t=1900 phase=awaiting_report delivered='1000' completed='' unread_esc='1400' reconcile='' resend=''
+  status log:
+    blocked [key=pending-reply-650c1d2c48b077ac] [at=1793066104]: pending-reply-unread: task=mate1 pending-reply-id=650c1d2c48b077ac landed 6m ago, unread (1 unhandled, oldest 0m; composer unknown); remedy: fm-peek.sh mate1, then fm-send.sh mate1 --key Enter request=please do X
+  unread escalation lines: 1
+  recovery sends: 0
+
+=== R2: delivery_unknown, but the record DID land in the mate inbox -> reconciled as delivered, no resend
+  before phase=delivery_unknown delivered='' completed='' unread_esc='' reconcile='' resend=''
+  t=1100 phase=awaiting_report delivered='1100' completed='' unread_esc='' reconcile='landed' resend=''
+  stored text removed: yes
+
+=== R3: delivery_unknown, record never landed, no stored text -> checking stops (absent), no resend
+  t=1100 phase=escalated delivered='' completed='' unread_esc='' reconcile='absent' resend=''
+  t=2500 phase=escalated delivered='' completed='' unread_esc='' reconcile='absent' resend=''
+  fm-on calls: 10
+
+=== R4: delivery_unknown, never landed, stored text too old (>7200s) -> no resend
+  t=9000 phase=escalated delivered='' completed='' unread_esc='' reconcile='absent' resend=''
+  inbox records written by tracker: 0 (expect 0)
+
+=== R5: delivery_unknown, never landed, fresh stored text -> exactly one automatic same-correlation resend through fm-send
+  t=1100 phase=awaiting_report delivered='' completed='' unread_esc='' reconcile='resent' resend='1100'
+  fm-on log tail:
+    fm-on mate1 fm-remote-secondmate-control.sh inbox-status mate1 bd6b2f0acde2c9a6
+    fm-on mate1 fm-remote-secondmate-control.sh inbox-status mate1 3d4e80e525bb3abc
+    fm-on mate1 fm-remote-secondmate-control.sh send mate1 [fm-from-firstmate]⁣corr=3d4e80e525bb3abc please do V
+  mate inbox now:
+  t=1200 phase=awaiting_report delivered='' completed='' unread_esc='' reconcile='resent' resend='1100'
+  t=1900 phase=awaiting_report delivered='' completed='' unread_esc='' reconcile='resent' resend='1100'
+  inbox record count (must stay 1, no second resend): 0

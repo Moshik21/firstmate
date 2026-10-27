@@ -1,0 +1,6 @@
+== A: NOT a secondmate home (no .fm-secondmate-home) with an aged parent-route inbox -> no wake
+queued parent-inbox entries: 
+== B: secondmate home, record younger than grace (3600s) -> no wake
+queued parent-inbox entries: 
+== C: secondmate home, grace 1s -> wake
+queued parent-inbox entries: 1

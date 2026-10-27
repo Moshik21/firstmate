@@ -1,0 +1,9 @@
+/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.BvKEoo/s4.sh: line 6: tmux: command not found
+[base] t=1200 phase=awaiting_report turn_completed='' recovery_attempted='' escalated=''
+[base] t=1400 phase=awaiting_report turn_completed='' recovery_attempted='' escalated=''
+[base] t=1700 phase=awaiting_report turn_completed='' recovery_attempted='' escalated=''
+[base] hook calls:        0
+[base] mate inbox unhandled still:        1
+--- ack record; mate still idle (genuine quick turn)
+[base] t=1800 phase=awaiting_report turn_completed='' recovery_attempted='' escalated=''
+[base] t=2000 phase=awaiting_report turn_completed='' recovery_attempted='' escalated=''
