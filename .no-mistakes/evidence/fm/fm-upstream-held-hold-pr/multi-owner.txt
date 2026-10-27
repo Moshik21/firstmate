@@ -1,0 +1,16 @@
+{
+  "counts": {
+    "captain": 1,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "captain": [
+    {
+      "task": "ownb",
+      "url": "https://github.com/o/r/pull/9",
+      "reason": "checks green; merge approval needed"
+    }
+  ],
+  "proven_clear": false
+}
