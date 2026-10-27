@@ -1,0 +1,62 @@
+### A. Host down at send; first check fails; host back seconds later (finding 2) -> one resend lands, ack resolves
+   fm-send: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   fm-send: ●  WATCHER DOWN - SUPERVISION IS OFF
+   fm-send: ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+   fm-send: ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+   fm-send: ●  This is a supervision warning only; the requested message WILL still be sent.
+   fm-send: ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+   fm-send: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   fm-send: error: steer to remote secondmate rsm is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+   fm-send: FM_HOME=/tmp/fm-send-remote-delivery.sBB4rj/walk-a-21083 FM_PENDING_REPLY_EXISTING_CORR=6a21ba9d3c02620a /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M5Z7MQJEF6WC14TKSSAV8DBC/bin/fm-send.sh rsm please\ append\ one\ line
+   corr=6a21ba9d3c02620a
+   record: delivered_epoch= resolved_via= phase=delivery_unknown 
+   ssh dials so far: 2; remote inbox:  handled: 
+-- 11:00:11 tracker pass, host still DOWN
+   record: delivered_epoch= resolved_via= delivery_read_failed_epoch=1793124011 phase=escalated 
+   ssh dials so far: 3; remote inbox:  handled: 
+   status: blocked [key=pending-reply-6a21ba9d3c02620a] [at=1793124012]: pending-reply-delivery-unknown: task=rsm pending-reply-id=6a21ba9d3c02620a req
+-- 11:00:12 tracker pass immediately, host UP (inside 3s read-retry; must not dial)
+   record: delivered_epoch= resolved_via= delivery_read_failed_epoch=1793124011 phase=escalated 
+   ssh dials so far: 3; remote inbox:  handled: 
+-- 11:00:16 tracker pass 4s later, host UP (well inside 600s recheck)
+   record: resolved_via= delivery_read_failed_epoch= delivery_checked_epoch=1793124016 delivery_resend_epoch=1793124016 delivery_reconcile=resent phase=awaiting_report delivered_epoch=1793124017 
+   ssh dials so far: 5; remote inbox: 001.msg  handled: 
+   remote record: schema=fm-task-inbox.v1 at=2026-10-27T18:00:17Z body-terminator=1 -- [fm-from-firstmate]⁣corr=6a21ba9d3c02620a please append one line 
+   inbox-status: schema=fm-inbox-status.v1 unhandled=1 oldest_age=1 corr_state=unhandled composer=unknown 
+   status: resolved [key=pending-reply-6a21ba9d3c02620a] [at=1793124017]: pending-reply-resolved: task=rsm pending-reply-id=6a21ba9d3c02620a via=delivery-reconciled resent
+-- remote mate handles it and reports
+   inbox-status: schema=fm-inbox-status.v1 unhandled=0 oldest_age= corr_state=handled composer=unknown 
+   record: delivery_read_failed_epoch= delivery_checked_epoch=1793124016 delivery_resend_epoch=1793124016 delivery_reconcile=resent delivered_epoch=1793124017 phase=resolved resolved_via=status 
+   ssh dials so far: 8; remote inbox:  handled: 001.msg 
+
+### B. Lost reply whose record DID land -> reconciled as landed, no resend
+   fm-send: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   fm-send: ●  WATCHER DOWN - SUPERVISION IS OFF
+   fm-send: ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+   record: delivered_epoch= resolved_via= phase=delivery_unknown 
+   ssh dials so far: 2; remote inbox: 001.msg  handled: 
+   record: resolved_via= delivery_checked_epoch=1793124021 delivered_epoch=1793124021 delivery_reconcile=landed phase=awaiting_report 
+   ssh dials so far: 3; remote inbox: 001.msg  handled: 
+
+### C. Resend refused with a definite remote error (exit 1) -> not orphaned, escalates delivery-unknown
+   record: delivered_epoch= resolved_via= phase=delivery_unknown 
+   ssh dials so far: 2; remote inbox:  handled: 
+   record: delivered_epoch= resolved_via= delivery_checked_epoch=1793124023 delivery_resend_epoch=1793124023 delivery_reconcile=resent phase=escalated 
+   ssh dials so far: 4; remote inbox:  handled: 
+   status: blocked [key=pending-reply-02d0bec7fc5a5e68] [at=1793124024]: pending-reply-delivery-unknown: task=rsm pending-reply-id=02d0bec7fc5a5e68 request=please append o
+   open decisions: pending-reply-02d0bec7fc5a5e68
+
+### D. Delivered request a parked mate never reads -> one unread escalation (UNREAD_SECS=2)
+   fm-send: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   fm-send: ●  WATCHER DOWN - SUPERVISION IS OFF
+   fm-send: ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+   fm-send: ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+   fm-send: ●  This is a supervision warning only; the requested message WILL still be sent.
+   fm-send: ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+   fm-send: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   fm-send: notice: doorbell not typed because the agent in fm-remote:p1 has exited; the steer is durably recorded at /tmp/fm-send-remote-delivery.sBB4rj/walk-d-rhome/state/parent-route/rsm.inbox/001.msg for recovery
+   record: phase=awaiting_report resolved_via= delivered_epoch=1793124026 
+   ssh dials so far: 1; remote inbox: 001.msg  handled: 
+   status lines before bound: 0
+   unread escalations: 1
+   blocked [key=pending-reply-a497870a89ba1ed8] [at=1793124030]: pending-reply-unread: task=rsm pending-reply-id=a497870a89ba1ed8 landed 0m ago, unread (1 unhandled, oldest 0m; composer unknown); remedy: fm-peek.sh rsm, then fm-send.sh rsm --k
