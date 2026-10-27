@@ -1,4 +1,4 @@
-FM_TEST_BEGIN 2026-10-20T19:49:24Z tests/fm-pr-merge.test.sh family=pr-forge expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-27T05:11:01Z tests/fm-pr-merge.test.sh family=pr-forge expected_gate_skip=none
 ok - fm-pr-merge reports exact queue retry flags after a zero-exit false success
 ok - fm-pr-merge omits merge-queue retry guidance for a closed GitHub PR
 ok - fm-pr-merge aggregates agreeing merge-queue rules
@@ -115,6 +115,9 @@ ok - fm-pr-merge reports a red check and an unreported required check together w
 ok - fm-pr-merge refuses when the required checks cannot be read, and tells a plan without rules apart
 ok - fm-pr-merge --allow-missing waives only its named unreported check
 ok - fm-pr-merge --allow-missing is single use, attended-only, and GitHub-only like --allow-red
+ok - fm-pr-merge refuses a no-required-checks base that is behind, stale, failing, unrecorded, or unreadable
+ok - fm-pr-merge accepts suite=none with a reason and reports it as the worker's attestation
+ok - fm-pr-merge --attended-override waives the no-required-checks conditions only while attended
 ok - fm-pr-merge enforces required producer identity and named waivers
 ok - fm-pr-merge matches an app-bound required commit status by name
 ok - fm-pr-merge reports known missing checks and all independent read errors
@@ -122,7 +125,7 @@ ok - fm-pr-merge refuses --allow-red on Forgejo
 ok - fm-pr-merge refuses --allow-missing on Forgejo
 ok - fm-pr-merge --allow-no-pipeline waives only a null GitLab head pipeline and keeps every other condition
 ok - fm-pr-merge --allow-no-pipeline is attended-only, takes no value, and applies only to GitLab
-FM_TEST_END 2026-10-20T20:19:30Z tests/fm-pr-merge.test.sh exit=0 duration_ms=1805654 gate_skip=false
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1805881
-FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=1805654 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-pr-merge.test.sh duration_ms=1805654
+FM_TEST_END 2026-10-27T05:53:17Z tests/fm-pr-merge.test.sh exit=0 duration_ms=2536429 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=2536593
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=2536429 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-pr-merge.test.sh duration_ms=2536429
