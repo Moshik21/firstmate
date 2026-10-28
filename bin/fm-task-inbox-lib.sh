@@ -120,6 +120,13 @@ fm_task_inbox_grace_secs() {
   printf '%s' "$g"
 }
 
+# The watcher poll interval the ladder runs at (bin/fm-watch.sh FM_POLL).
+fm_task_inbox_poll_secs() {
+  local p=${FM_POLL:-15}
+  case "$p" in ''|*[!0-9]*|0) p=15 ;; esac
+  printf '%s' "$p"
+}
+
 fm_task_inbox_ring_max() {
   local m=${FM_TASK_INBOX_RING_MAX:-$FM_TASK_INBOX_RING_MAX_DEFAULT}
   case "$m" in ''|*[!0-9]*) m=$FM_TASK_INBOX_RING_MAX_DEFAULT ;; esac
@@ -463,11 +470,11 @@ _fm_task_inbox_ring_log() {  # <record-path> <decision> [detail]
 # bare `[Pasted text #N]` placeholder, optionally followed by a literal tail that
 # is the end of <line>. A placeholder hides its content, so an operator's paste
 # has the same shape: it is recognised only while the inbox's .ring-log already
-# shows an earlier ring of this record that typed the doorbell (rang or
+# shows a recent earlier ring of this record that typed the doorbell (rang or
 # unconfirmed). A `+M lines` placeholder or several placeholders are an
 # operator's paste, not a single-line doorbell, and are never recognised.
 _fm_task_inbox_herdr_holds_doorbell() {  # <line> <held> <record-path>
-  local line=$1 held=$2 rec=$3 rest dir
+  local line=$1 held=$2 rec=$3 rest dir now window cutoff
   fm_composer_normalize_spaces_var line
   fm_composer_normalize_spaces_var held
   line=${line//[$' \t\r\n\v\f']/}
@@ -482,8 +489,16 @@ _fm_task_inbox_herdr_holds_doorbell() {  # <line> <held> <record-path>
   [ -z "$rest" ] || [[ $line == *"$rest" ]] || return 1
   dir=${rec%/*}
   dir=${dir%/handled}
-  awk -F '\t' -v msg="${rec##*/}" '
-    $2 == msg && ($3 == "rang" || $3 == "unconfirmed") { found = 1; exit }
+  # Recent means within one re-ring spacing (the inbox grace) plus three watcher
+  # passes (FM_POLL, default 15 s): the next re-ring of a doorbell whose Enter
+  # was lost falls inside it, an operator paste long after the last ring does
+  # not. The log's UTC stamps sort as text.
+  now=$(date +%s)
+  window=$(( $(fm_task_inbox_grace_secs) + 3 * $(fm_task_inbox_poll_secs) ))
+  cutoff=$(date -u -r "$((now - window))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -d "@$((now - window))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) || return 1
+  awk -F '\t' -v msg="${rec##*/}" -v cutoff="$cutoff" '
+    $2 == msg && ($3 == "rang" || $3 == "unconfirmed") && $1 >= cutoff { found = 1; exit }
     END { exit(found ? 0 : 1) }
   ' "$dir/.ring-log" 2>/dev/null
 }

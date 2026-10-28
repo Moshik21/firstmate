@@ -1381,13 +1381,22 @@ test_herdr_bare_placeholder_needs_an_earlier_typed_ring() {
   rc=0; herdr_ring "$state" "$rec" "$composer" "$keys" || rc=$?
   [ "$rc" = 0 ] && [ "$(cat "$keys")" = Enter ] || fail "an exact doorbell must be submitted once, rc=$rc keys=$(cat "$keys")"
 
-  # After a ring of this record that typed the doorbell, its collapsed form is ours.
+  # Right after a ring of this record that typed the doorbell, its collapsed form is ours.
   : > "$keys"
   printf '[Pasted text #2]' > "$composer"
   rc=0; herdr_ring "$state" "$rec" "$composer" "$keys" || rc=$?
   [ "$rc" = 0 ] && [ "$(cat "$keys")" = Enter ] \
     || fail "a placeholder after an earlier typed ring must be submitted, rc=$rc keys=$(cat "$keys")"
-  pass "inbox: a Herdr bare paste placeholder is submitted only after an earlier ring of the record typed the doorbell"
+
+  # The same earlier ring, long ago: an operator paste now is not our doorbell.
+  awk -F '\t' -v OFS='\t' '{ $1 = "2020-01-01T00:00:00Z"; print }' "$state/t1.inbox/.ring-log" \
+    > "$state/t1.inbox/.ring-log.new" && mv "$state/t1.inbox/.ring-log.new" "$state/t1.inbox/.ring-log"
+  : > "$keys"
+  printf '[Pasted text #3]' > "$composer"
+  rc=0; herdr_ring "$state" "$rec" "$composer" "$keys" || rc=$?
+  [ "$rc" = 1 ] && [ ! -s "$keys" ] \
+    || fail "a placeholder whose only earlier typed ring is old must skip without Enter, rc=$rc keys=$(cat "$keys")"
+  pass "inbox: a Herdr bare paste placeholder is submitted only after a recent ring of the record typed the doorbell"
 }
 
 test_write_is_durable_and_exact
