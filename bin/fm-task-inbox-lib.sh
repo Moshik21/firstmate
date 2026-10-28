@@ -392,7 +392,7 @@ fm_task_inbox_ring() {  # <backend> <target> <record-path> [expected-label]
   cstate=$(fm_backend_composer_state "$backend" "$target" "$label" 2>/dev/null) || cstate=unknown
   case "$cstate" in
     pending)
-      if ! fm_task_inbox_composer_holds "$backend" "$target" "$line" "$label"; then
+      if ! fm_task_inbox_composer_holds "$backend" "$target" "$line" "$rec" "$label"; then
         _fm_task_inbox_ring_log "$rec" skipped:other-text "composer=pending"
         return 1
       fi
@@ -405,7 +405,7 @@ fm_task_inbox_ring() {  # <backend> <target> <record-path> [expected-label]
         return 2
       fi
       sleep 0.3
-      if ! fm_task_inbox_composer_holds "$backend" "$target" "$line" "$label"; then
+      if ! fm_task_inbox_composer_holds "$backend" "$target" "$line" "$rec" "$label"; then
         _fm_task_inbox_ring_log "$rec" rang "composer=own-doorbell submitted"
         return 0
       fi
@@ -457,14 +457,17 @@ _fm_task_inbox_ring_log() {  # <record-path> <decision> [detail]
   return 0
 }
 
-# Whether a Herdr composer read <held> is our own doorbell <line>: equal to it
-# ignoring whitespace and wrapping, or the shape Claude leaves when it collapses
-# the burst typed by the Herdr typing path - one bare `[Pasted text #N]`
-# placeholder, optionally followed by a literal tail that is the end of <line>.
-# A `+M lines` placeholder or several placeholders are an operator's paste, not
-# a single-line doorbell, and are never recognised.
-_fm_task_inbox_herdr_holds_doorbell() {  # <line> <held>
-  local line=$1 held=$2 rest
+# Whether a Herdr composer read <held> is our own doorbell <line> for
+# <record-path>: equal to it ignoring whitespace and wrapping, or the shape
+# Claude leaves when it collapses the burst typed by the Herdr typing path - one
+# bare `[Pasted text #N]` placeholder, optionally followed by a literal tail that
+# is the end of <line>. A placeholder hides its content, so an operator's paste
+# has the same shape: it is recognised only while the inbox's .ring-log already
+# shows an earlier ring of this record that typed the doorbell (rang or
+# unconfirmed). A `+M lines` placeholder or several placeholders are an
+# operator's paste, not a single-line doorbell, and are never recognised.
+_fm_task_inbox_herdr_holds_doorbell() {  # <line> <held> <record-path>
+  local line=$1 held=$2 rec=$3 rest dir
   fm_composer_normalize_spaces_var line
   fm_composer_normalize_spaces_var held
   line=${line//[$' \t\r\n\v\f']/}
@@ -475,9 +478,14 @@ _fm_task_inbox_herdr_holds_doorbell() {  # <line> <held>
   [ "$held" = "$line" ] && return 0
   [[ $held =~ ^\[Pastedtext#[0-9]+\](.*)$ ]] || return 1
   rest=${BASH_REMATCH[1]}
-  [ -n "$rest" ] || return 0
   case "$rest" in *'[Pastedtext#'*) return 1 ;; esac
-  [[ $line == *"$rest" ]]
+  [ -z "$rest" ] || [[ $line == *"$rest" ]] || return 1
+  dir=${rec%/*}
+  dir=${dir%/handled}
+  awk -F '\t' -v msg="${rec##*/}" '
+    $2 == msg && ($3 == "rang" || $3 == "unconfirmed") { found = 1; exit }
+    END { exit(found ? 0 : 1) }
+  ' "$dir/.ring-log" 2>/dev/null
 }
 
 # Whether the composer's content is exactly <line>, ignoring line wrapping.
@@ -485,15 +493,15 @@ _fm_task_inbox_herdr_holds_doorbell() {  # <line> <held>
 # path uses (fm_backend_herdr_composer_content), so a doorbell that path typed
 # - wrapped, or collapsed into a placeholder - is recognised as our own rather
 # than skipped as someone else's draft. Other backends compare a plain capture.
-fm_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
+fm_task_inbox_composer_holds() {  # <backend> <target> <line> <record-path> [expected-label]
   local cap held
   fm_backend_source "$1" || return 1
   if [ "$1" = herdr ]; then
     held=$(fm_backend_herdr_composer_content "$2" 2>/dev/null) || return 1
-    _fm_task_inbox_herdr_holds_doorbell "$3" "$held"
+    _fm_task_inbox_herdr_holds_doorbell "$3" "$held" "$4"
     return
   fi
-  cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 1
+  cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${5:-}" 2>/dev/null) || return 1
   held=$(fm_composer_extract_selected_content styled=0 "$cap") || return 1
   [ -n "$held" ] && [ "$(printf '%s' "$held" | tr -d '[:space:]')" = "$(printf '%s' "$3" | tr -d '[:space:]')" ]
 }

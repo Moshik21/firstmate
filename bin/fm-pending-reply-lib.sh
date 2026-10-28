@@ -113,7 +113,10 @@
 #     FM_PENDING_REPLY_RESEND_MAX_AGE_SECS, because a stale instruction must
 #     not land unannounced. Once delivery is known either way, the open
 #     delivery-unknown decision is closed with the via=delivery-reconciled
-#     note; the request itself keeps waiting for its correlated report.
+#     note (a landed record is marked delivered only after that close, and a
+#     resent one's failed close is retried every pass until it is recorded in
+#     escalation_closed_epoch); the request itself keeps waiting for its
+#     correlated report.
 # An inbox read that fails (an unreachable host, or a remote copy without the
 # inbox-status leg) changes nothing about the record's delivery state, and it
 # does not start the long recheck spacing: the next read of that record waits
@@ -1305,16 +1308,28 @@ fm_pending_reply_close_escalation() {  # <state-dir> <corr_id>
 }
 
 _fm_pending_reply_close_escalation_locked() {  # <state-dir> <corr_id>
-  local state=$1 corr=$2 rec escalated closed now
+  local state=$1 corr=$2 rec escalated closed now phase via reconcile
   rec=$(fm_pending_reply_path "$state" "$corr")
   [ -f "$rec" ] || return 1
-  [ "$(fm_pending_reply_get "$rec" phase)" = resolved ] || return 0
   escalated=$(fm_pending_reply_get "$rec" escalated_epoch)
   [ -n "$escalated" ] || return 0
   closed=$(fm_pending_reply_get "$rec" escalation_closed_epoch)
   [ -z "$closed" ] || return 0
-  _fm_pending_reply_close_open_escalation_locked "$rec" "$corr" \
-    "$(fm_pending_reply_get "$rec" resolved_via)" || return 1
+  phase=$(fm_pending_reply_get "$rec" phase)
+  if [ "$phase" = resolved ]; then
+    via=$(fm_pending_reply_get "$rec" resolved_via)
+  else
+    # A delivery-unknown escalation whose request the inbox reconciliation
+    # since found delivered (landed or resent). A later unread or missed
+    # escalation is not this one and stays open until the report resolves it.
+    reconcile=$(fm_pending_reply_get "$rec" delivery_reconcile)
+    case "$reconcile" in landed|resent) ;; *) return 0 ;; esac
+    [ -n "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
+      && [ -z "$(fm_pending_reply_get "$rec" unread_escalated_epoch)" ] \
+      && [ "$phase" != escalated ] || return 0
+    via="delivery-reconciled $reconcile"
+  fi
+  _fm_pending_reply_close_open_escalation_locked "$rec" "$corr" "$via" || return 1
   now=$(fm_pending_reply_now)
   fm_pending_reply_set "$rec" escalation_closed_epoch "$now"
 }
@@ -1461,6 +1476,10 @@ _fm_pending_reply_maybe_escalate_locked() {  # <state-dir> <corr_id>
     printf '%s\n' "$(status_stamp_line "$line")" >> "$parent_status" 2>/dev/null || return 1
   fi
   now=$(fm_pending_reply_now)
+  # A new decision is open, so an earlier delivery-reconciled close no longer
+  # describes it.
+  [ -z "$(fm_pending_reply_get "$rec" escalation_closed_epoch)" ] \
+    || fm_pending_reply_set "$rec" escalation_closed_epoch "" || return 1
   fm_pending_reply_set "$rec" escalated_epoch "$now" || return 1
   fm_pending_reply_set "$rec" phase escalated || return 1
   return 0
@@ -1623,6 +1642,8 @@ _fm_pending_reply_escalate_unread_locked() {  # <state-dir> <corr_id> <age-secs>
     printf '%s\n' "$(status_stamp_line "$line")" >> "$parent_status" 2>/dev/null || return 1
   fi
   now=$(fm_pending_reply_now)
+  [ -z "$(fm_pending_reply_get "$rec" escalation_closed_epoch)" ] \
+    || fm_pending_reply_set "$rec" escalation_closed_epoch "" || return 1
   fm_pending_reply_set "$rec" unread_escalated_epoch "$now" || return 1
   fm_pending_reply_set "$rec" escalated_epoch "$now"
 }
@@ -1687,7 +1708,10 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
     rm -f "$text_path" 2>/dev/null || true
     return 0
   fi
-  text=$(cat "$text_path" 2>/dev/null) || return 1
+  # Byte-exact: a bare $(cat) would drop the body's trailing newlines, and the
+  # mate's inbox dedup compares the whole body.
+  text=$(cat "$text_path" 2>/dev/null && printf x) || return 1
+  text=${text%x}
   fm_pending_reply_set "$rec" delivery_resend_epoch "$now" || return 1
   fm_pending_reply_set "$rec" delivery_reconcile resent || return 1
   # fm-send owns the outcome: success confirms delivery on the record, and an
@@ -1705,26 +1729,30 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
     fm_lock_release "$lock"
     return "$rc"
   fi
-  _fm_pending_reply_close_open_escalation_locked "$rec" "$corr" \
-    "delivery-reconciled resent" || rc=$?
+  _fm_pending_reply_close_escalation_locked "$state" "$corr" || rc=$?
   fm_lock_release "$lock"
   return "$rc"
 }
 
 _fm_pending_reply_reconcile_landed_locked() {  # <state-dir> <corr_id> <epoch>
-  local state=$1 corr=$2 now=$3 rec phase
+  local state=$1 corr=$2 now=$3 rec phase escalated
   rec=$(fm_pending_reply_path "$state" "$corr")
   [ -f "$rec" ] || return 1
   [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] || return 0
   phase=$(fm_pending_reply_get "$rec" phase)
   case "$phase" in delivery_unknown|escalated) ;; *) return 0 ;; esac
+  # Close before marking delivered: a failed close leaves the record
+  # undelivered, so the next check retries it.
+  escalated=$(fm_pending_reply_get "$rec" escalated_epoch)
+  if [ -n "$escalated" ]; then
+    _fm_pending_reply_close_open_escalation_locked "$rec" "$corr" "delivery-reconciled landed" || return 1
+  fi
   fm_pending_reply_set "$rec" delivered_epoch "$now" || return 1
   fm_pending_reply_set "$rec" delivery_reconcile landed || return 1
   fm_pending_reply_set "$rec" phase awaiting_report || return 1
   rm -f "$(fm_pending_reply_delivery_confirmation_path "$state" "$corr")" \
     "$(fm_pending_reply_undelivered_text_path "$state" "$corr")" 2>/dev/null || true
-  [ -z "$(fm_pending_reply_get "$rec" escalated_epoch)" ] \
-    || _fm_pending_reply_close_open_escalation_locked "$rec" "$corr" "delivery-reconciled landed"
+  [ -z "$escalated" ] || fm_pending_reply_set "$rec" escalation_closed_epoch "$now"
 }
 
 # Detect a correlated report written under the secondmate home (wrong home)
@@ -1969,6 +1997,10 @@ fm_pending_reply_tick() {  # <state-dir>
       esac
       continue
     fi
+    # Retries a delivery-reconciled close that failed on a status write.
+    case "$(fm_pending_reply_get "$rec" delivery_reconcile)" in
+      landed|resent) fm_pending_reply_close_escalation "$state" "$corr" || true ;;
+    esac
     case "$phase" in
       awaiting_report|recovery_sending)
         if [ -n "$(fm_pending_reply_get "$rec" recovery_attempted_epoch)" ]; then

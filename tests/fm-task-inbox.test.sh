@@ -1337,6 +1337,59 @@ test_parent_inbox_tick_is_silent_outside_a_secondmate_home() {
   pass "watcher: a home without a secondmate identity ignores a parent-route inbox"
 }
 
+# On Herdr a bare `[Pasted text #N]` hides its content, so an operator's own
+# paste looks like our collapsed doorbell. It is submitted only once the ring
+# log shows an earlier ring of this record typed the doorbell; a first ring
+# that meets it skips without Enter. The Herdr pane I/O (agent, composer and
+# busy reads, key sends) is a fixture over a composer file; the ring decision
+# and the doorbell match are the production code.
+herdr_ring() {  # <state> <record> <composer-file> <keys-log>
+  FM_STATE_OVERRIDE="$1" FM_FAKE_COMPOSER="$3" FM_SEND_LOG="$4" bash -c '
+    . "$1"
+    fm_backend_source herdr
+    fm_backend_herdr_agent_state() { printf alive; }
+    fm_backend_herdr_busy_state() { printf idle; }
+    fm_backend_herdr_composer_state() { if [ -s "$FM_FAKE_COMPOSER" ]; then printf pending; else printf empty; fi; }
+    fm_backend_herdr_composer_content() { cat "$FM_FAKE_COMPOSER"; }
+    fm_backend_herdr_send_key() { printf "%s\n" "$2" >> "$FM_SEND_LOG"; : > "$FM_FAKE_COMPOSER"; }
+    fm_task_inbox_ring herdr default:w1:p2 "$2"
+  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$2"
+}
+
+test_herdr_bare_placeholder_needs_an_earlier_typed_ring() {
+  local dir state rec composer keys doorbell rc
+  dir="$TMP_ROOT/herdr-placeholder"
+  state="$dir/state"
+  mkdir -p "$state"
+  rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue")
+  doorbell=$(inbox_lib "$state" fm_task_inbox_doorbell_line "$rec")
+  composer="$dir/composer"; keys="$dir/keys"; : > "$keys"
+
+  printf '[Pasted text #1]' > "$composer"
+  rc=0; herdr_ring "$state" "$rec" "$composer" "$keys" || rc=$?
+  [ "$rc" = 1 ] || fail "a first ring meeting a bare placeholder must skip, got rc=$rc"
+  [ ! -s "$keys" ] || fail "a bare placeholder with no earlier typed ring must not get Enter: $(cat "$keys")"
+  [ "$(cat "$composer")" = '[Pasted text #1]' ] || fail "the operator's paste must stay in the composer"
+  tail -1 "$state/t1.inbox/.ring-log" | grep -q '	001.msg	skipped:other-text	' \
+    || fail "the skip must be logged as other text: $(cat "$state/t1.inbox/.ring-log")"
+  printf '[Pasted text #1]%s' "${doorbell: -12}" > "$composer"
+  rc=0; herdr_ring "$state" "$rec" "$composer" "$keys" || rc=$?
+  [ "$rc" = 1 ] && [ ! -s "$keys" ] || fail "a placeholder plus doorbell tail with no earlier typed ring must skip, rc=$rc"
+
+  # Exact whole-line equality is our doorbell without any log entry.
+  printf '%s' "$doorbell" > "$composer"
+  rc=0; herdr_ring "$state" "$rec" "$composer" "$keys" || rc=$?
+  [ "$rc" = 0 ] && [ "$(cat "$keys")" = Enter ] || fail "an exact doorbell must be submitted once, rc=$rc keys=$(cat "$keys")"
+
+  # After a ring of this record that typed the doorbell, its collapsed form is ours.
+  : > "$keys"
+  printf '[Pasted text #2]' > "$composer"
+  rc=0; herdr_ring "$state" "$rec" "$composer" "$keys" || rc=$?
+  [ "$rc" = 0 ] && [ "$(cat "$keys")" = Enter ] \
+    || fail "a placeholder after an earlier typed ring must be submitted, rc=$rc keys=$(cat "$keys")"
+  pass "inbox: a Herdr bare paste placeholder is submitted only after an earlier ring of the record typed the doorbell"
+}
+
 test_write_is_durable_and_exact
 test_doorbell_is_a_shell_noop
 test_doorbell_rejects_terminal_controls
@@ -1388,3 +1441,4 @@ test_ring_log_records_each_decision_and_stays_bounded
 test_ring_log_records_a_dead_agent
 test_parent_inbox_tick_wakes_a_parked_mate_once_per_oldest_record
 test_parent_inbox_tick_is_silent_outside_a_secondmate_home
+test_herdr_bare_placeholder_needs_an_earlier_typed_ring

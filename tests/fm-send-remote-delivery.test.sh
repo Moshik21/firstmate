@@ -1059,6 +1059,87 @@ test_remote_unlanded_record_is_resent_once_and_recheck_is_not_delayed_by_a_faile
   pass "fm-pending-reply remote: an unlanded record is resent once, the first failed read does not delay it, and no second resend follows"
 }
 
+# Scenario 3, byte-exact: the remote inbox dedups on the whole body, so the
+# resend carries the stored request with its trailing newline intact.
+test_remote_resend_keeps_the_request_body_byte_exact() {
+  local dir fb ssh_log home rhome corr text body
+  dir="$TMP_ROOT/remote-resend-exact"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-resend-exact)
+  home=$(setup_remote_parent_home remote-resend-exact "$rhome")
+  text=$'please append one line\n'
+  corr=$(send_remote_request "$fb" "$home" "$ssh_log" 12000 "$text" FM_FAKE_SSH_RC=255)
+  [ "$(cat "$(fm_pending_reply_undelivered_text_path "$home/state" "$corr")"; printf x)" = "${text}x" ] \
+    || fail "the unconfirmed send must store its request byte-exact"
+  tracker_pass "$fb" "$home" "$ssh_log" 12040 FM_FAKE_SSH_RC=255
+  tracker_pass "$fb" "$home" "$ssh_log" 12100
+  [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 1 ] \
+    || fail "the reachable host must receive exactly one resend"
+  body=$(fm_task_inbox_body "$(remote_inbox_records "$rhome" | head -1)"; printf x)
+  case "$body" in
+    *"corr=$corr"*"$text"x) ;;
+    *) fail "the resent body must end with the request's trailing newline: $(printf '%q' "$body")" ;;
+  esac
+  case "$body" in *$'\n\n'x) fail "the resend must not add a newline: $(printf '%q' "$body")" ;; esac
+  pass "fm-pending-reply remote: the one resend keeps the stored request's trailing newline"
+}
+
+# Scenario 2 and 3, a close that cannot be written: the delivery-unknown
+# decision is closed on a later pass instead of staying open for the task.
+test_remote_failed_reconciliation_close_is_retried() {
+  local dir fb ssh_log home rhome corr rec status
+  dir="$TMP_ROOT/remote-close-retry"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+
+  # Landed: the record stays undelivered until the close lands.
+  rhome=$(setup_remote_secondmate_home remote-close-retry-landed)
+  home=$(setup_remote_parent_home remote-close-retry-landed "$rhome")
+  corr=$(send_remote_request "$fb" "$home" "$ssh_log" 11000 "please append one line" FM_FAKE_SSH_AMBIGUOUS=1)
+  rec=$(fm_pending_reply_path "$home/state" "$corr")
+  status="$home/state/rsm.status"
+  tracker_pass "$fb" "$home" "$ssh_log" 11010 FM_FAKE_SSH_RC=255
+  [ "$(status_open_decisions "$status" | cut -f1)" = "pending-reply-$corr" ] \
+    || fail "the delivery-unknown decision must be open: $(cat "$status")"
+  chmod a-w "$status"
+  tracker_pass "$fb" "$home" "$ssh_log" 11070
+  chmod u+w "$status"
+  [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
+    || fail "a landed record whose close failed must stay undelivered: $(cat "$rec")"
+  [ -n "$(status_open_decisions "$status")" ] || fail "the failed close must not have written"
+  tracker_pass "$fb" "$home" "$ssh_log" 11670
+  [ "$(fm_pending_reply_get "$rec" delivery_reconcile)" = landed ] \
+    || fail "the next check must reconcile the record as landed: $(cat "$rec")"
+  [ -z "$(status_open_decisions "$status")" ] \
+    || fail "the retried check must close the decision: $(status_open_decisions "$status")"
+  [ -n "$(fm_pending_reply_get "$rec" escalation_closed_epoch)" ] \
+    || fail "the close must be recorded: $(cat "$rec")"
+
+  # Resent: delivery is confirmed by fm-send, and a later pass retries the close.
+  rhome=$(setup_remote_secondmate_home remote-close-retry-resent)
+  home=$(setup_remote_parent_home remote-close-retry-resent "$rhome")
+  corr=$(send_remote_request "$fb" "$home" "$ssh_log" 12000 "please append one line" FM_FAKE_SSH_RC=255)
+  rec=$(fm_pending_reply_path "$home/state" "$corr")
+  status="$home/state/rsm.status"
+  tracker_pass "$fb" "$home" "$ssh_log" 12040 FM_FAKE_SSH_RC=255
+  chmod a-w "$status"
+  tracker_pass "$fb" "$home" "$ssh_log" 12100
+  chmod u+w "$status"
+  [ "$(fm_pending_reply_get "$rec" delivery_reconcile)" = resent ] \
+    && [ -n "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
+    || fail "the resend must have landed and confirmed delivery: $(cat "$rec")"
+  [ -n "$(status_open_decisions "$status")" ] && [ -z "$(fm_pending_reply_get "$rec" escalation_closed_epoch)" ] \
+    || fail "the failed close must leave the decision open and unrecorded: $(cat "$rec")"
+  tracker_pass "$fb" "$home" "$ssh_log" 12160
+  [ -z "$(status_open_decisions "$status")" ] \
+    || fail "a later pass must close the decision: $(status_open_decisions "$status")"
+  grep -F "resolved [key=pending-reply-$corr]" "$status" | grep -qF 'via=delivery-reconciled resent' \
+    || fail "the retried close must say the record was resent: $(cat "$status")"
+  [ -n "$(fm_pending_reply_get "$rec" escalation_closed_epoch)" ] \
+    || fail "the retried close must be recorded: $(cat "$rec")"
+  [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 1 ] || fail "the retry must not resend"
+  pass "fm-pending-reply remote: a delivery-reconciled close that could not be written is retried on a later pass"
+}
+
 # Scenario 3 bounds: the recheck spacing, the stored text, and the age limit.
 test_remote_undelivered_check_honours_spacing_text_and_age_limits() {
   local dir fb ssh_log home rhome corr rec before
@@ -1396,6 +1477,8 @@ test_remote_unreadable_inbox_leaves_the_idle_counting_as_before
 test_remote_lost_reply_reconciles_as_landed
 test_remote_landed_reconciliation_closes_the_delivery_unknown_decision
 test_remote_unlanded_record_is_resent_once_and_recheck_is_not_delayed_by_a_failed_read
+test_remote_resend_keeps_the_request_body_byte_exact
+test_remote_failed_reconciliation_close_is_retried
 test_remote_undelivered_check_honours_spacing_text_and_age_limits
 test_remote_failed_resend_is_never_repeated
 test_remote_definitely_failed_resend_stays_tracked_and_escalates
