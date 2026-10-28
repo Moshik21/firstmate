@@ -274,22 +274,28 @@ test_single_flight_claim_admits_one_park() {
 # A park that has delivered a wake still holds the claim until its EXIT
 # cleanup. The holder here is that park's state: a live claim and a delivered
 # record naming it, released a second after the woken turn's Stop starts.
+# The holder records $1 while it holds the claim for $2 seconds, then records
+# delivered and releases it, as a park finishing its queue call does.
 test_stop_rearms_after_a_delivering_park_releases_its_claim() {
-  local home out holder
-  home=$(make_home delivered-claim opted-in)
+  local held=$1 hold=$2 home out holder
+  home=$(make_home "$held-claim" opted-in)
   printf 'wake\n' > "$home/arm-mode"
   cat > "$home/holder.sh" <<'SH'
 . "$1/fm-wake-lib.sh"
 STATE=$FM_HOME/state
 fm_lock_try_acquire "$STATE/.codex-park.lock" || exit 1
-jq -n --arg session "$SESSION_ID" --argjson pid "$$" \
-  '{session:$session,pid:$pid,at:0,outcome:"delivered"}' > "$STATE/.codex-park.json"
+held() {
+  jq -n --arg session "$SESSION_ID" --argjson pid "$$" --arg outcome "$1" \
+    '{session:$session,pid:$pid,at:0,outcome:$outcome}' > "$STATE/.codex-park.json"
+}
+held "$2"
 echo "$$" > "$FM_HOME/holder.pid"
-sleep 1
+sleep "$3"
+held delivered
 fm_lock_release "$STATE/.codex-park.lock"
 SH
   out=$(under_codex "$home" "$REGISTER"'
-    bash "$FM_HOME/holder.sh" "$(dirname "$PARK")" &
+    bash "$FM_HOME/holder.sh" "$(dirname "$PARK")" '"$held $hold"' &
     holder=$!
     i=0
     until [ -s "$FM_HOME/holder.pid" ]; do
@@ -308,7 +314,7 @@ SH
   assert_equals delivered "$(outcome "$home")" "the rearmed park must record its delivered wake"
   [ "$(jq -r .pid "$home/state/.codex-park.json")" != "$holder" ] \
     || fail "the delivered record must belong to the rearmed park, not the earlier holder"
-  pass "a Stop that meets a delivering park's claim waits for its release and rearms"
+  pass "a Stop that meets a $held park's claim held ${hold}s waits for its release and rearms"
 }
 
 test_failed_queue_delivery_latches_fallback() {
@@ -445,7 +451,8 @@ test_host_quiet_boundary_retains_the_watcher() {
 test_unconfigured_home_keeps_the_foreground_checkpoint
 test_version_gate_selects_only_the_verified_cli
 test_single_flight_claim_admits_one_park
-test_stop_rearms_after_a_delivering_park_releases_its_claim
+test_stop_rearms_after_a_delivering_park_releases_its_claim delivered 1
+test_stop_rearms_after_a_delivering_park_releases_its_claim delivering 4
 test_failed_queue_delivery_latches_fallback
 test_repeated_arm_failure_latches_fallback
 test_watcher_exits_when_its_park_owner_is_gone

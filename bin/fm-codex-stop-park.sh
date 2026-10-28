@@ -61,6 +61,7 @@ SESSION_FILE="$STATE/.codex-park-session"
 CLAIM="$STATE/.codex-park.lock"
 RECORD="$STATE/.codex-park.json"
 FALLBACK="$STATE/.codex-park-fallback"
+DELIVERY_TIMEOUT=20
 SESSION=
 CHILD=
 OUT=
@@ -133,7 +134,7 @@ fallback() { printf '%s\n' "$SESSION" > "$FALLBACK"; }
 deliver() {
   local message=$1
   fm_session_lock_owned_by_self "$STATE" && registered || return 1
-  fm_run_timed 20 "$CODEX_COMMAND" queue --thread "$SESSION" --message "$message" > "$STATE/.codex-park-delivery.tmp.$$" 2>&1
+  fm_run_timed "$DELIVERY_TIMEOUT" "$CODEX_COMMAND" queue --thread "$SESSION" --message "$message" > "$STATE/.codex-park-delivery.tmp.$$" 2>&1
   local rc=$?
   rm -f "$STATE/.codex-park-delivery.tmp.$$"
   return "$rc"
@@ -208,13 +209,15 @@ fi
 [ -n "$SESSION" ] && capable || exit 0
 [ ! -e "$STATE/.afk" ] && fm_supervision_needed "$STATE" || exit 0
 if ! fm_lock_try_acquire "$CLAIM"; then
-  # A park that has just delivered this session's wake holds the claim until
-  # its EXIT cleanup; the woken turn's Stop waits for it (about 3s) to rearm.
+  # A park delivering this session's wake holds the claim until its EXIT
+  # cleanup; the woken turn's Stop can arrive before the queue call returns.
+  # Wait up to DELIVERY_TIMEOUT plus a 5s margin, in 0.1s steps, to rearm.
   holder=$FM_LOCK_HELD_PID
   jq -e --arg session "$SESSION" --arg pid "$holder" \
-    '.session == $session and .outcome == "delivered" and (.pid | tostring) == $pid' \
+    '.session == $session and (.outcome == "delivering" or .outcome == "delivered")
+      and (.pid | tostring) == $pid' \
     "$RECORD" >/dev/null 2>&1 && fm_pid_alive "$holder" || exit 0
-  for _ in $(seq 30); do
+  for _ in $(seq $(((DELIVERY_TIMEOUT + 5) * 10))); do
     [ -e "$CLAIM" ] || [ -L "$CLAIM" ] || break
     sleep 0.1
   done
@@ -232,7 +235,8 @@ previous_session=$(jq -r '.session // empty' "$RECORD" 2>/dev/null || true)
 rm -f "$STATE"/.codex-park-output.* "$STATE"/.codex-park-delivery.tmp.* "$RECORD".tmp.*
 record arming || exit 1
 if [ "$previous_session" = "$SESSION" ] \
-  && { [ "$previous" = waiting ] || [ "$previous" = arming ] || [ "$previous" = interrupted ]; }; then
+  && { [ "$previous" = waiting ] || [ "$previous" = arming ] || [ "$previous" = delivering ] \
+    || [ "$previous" = interrupted ]; }; then
   if ! deliver 'Firstmate Codex park recovered a dead or interrupted owner. Drain the durable wake queue and inspect state/.codex-park.json; automatic supervision is restarting.'; then
     record delivery-failed; fallback; exit 1
   fi
@@ -265,6 +269,7 @@ while [ "$attempt" -lt 2 ]; do
   CHILD=
   if [ "$rc" -eq 0 ] && grep -Eq '^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)' "$OUT"; then
     wake=$(grep -E '^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)' "$OUT")
+    record delivering || exit 1
     if deliver "Firstmate watcher wake: $wake
 Run bin/fm-wake-drain.sh first. Handle every presented wake, open decision and unread status, then run its exact WAKE_ACK_REQUIRED command. The next Stop re-arms automatically; do not run a foreground checkpoint."; then
       record delivered
