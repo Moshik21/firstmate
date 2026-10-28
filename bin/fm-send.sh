@@ -964,8 +964,11 @@ else
       if [ -n "$PENDING_REPLY_CORR" ]; then
         fm_pending_reply_mark_delivery_unknown "$STATE" "$PENDING_REPLY_CORR" || true
         # Kept for the tracker's one same-correlation resend once the mate is
-        # reachable and its inbox proves the record never landed.
-        fm_pending_reply_store_undelivered_text "$STATE" "$PENDING_REPLY_CORR" "$RESOLVE_ANSWER_TEXT" || true
+        # reachable and its inbox proves the record never landed. A keyed
+        # answer stores none: only the printed resend closes its keys, so the
+        # tracker leaves that record to it.
+        [ -n "$RESOLVE_KEYS" ] ||
+          fm_pending_reply_store_undelivered_text "$STATE" "$PENDING_REPLY_CORR" "$RESOLVE_ANSWER_TEXT" || true
       fi
       if [ "$remote_rc" -eq 255 ]; then
         echo "error: steer to remote secondmate $TARGET_REMOTE_ID is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2

@@ -85,7 +85,9 @@
 # A remote send whose delivery stayed unknown also keeps its pre-marker request
 # text in state/pending-replies/.undelivered-text-<corr_id> (mode 600) until the
 # record is delivered, discarded, or reconciled, so that one resend can repeat
-# the exact original body (see the inbox reconciliation note below).
+# the exact original body (see the inbox reconciliation note below). A
+# --resolve-key answer keeps none: only fm-send's printed resend closes its
+# keys, so the tracker never reconciles a record without stored text.
 #
 # Inbox reconciliation (parent-owned, read-only on the mate's side): the
 # tracker reads where a request's record stands in the mate's steering inbox -
@@ -102,11 +104,12 @@
 #     missed-report escalation reuses the same decision key. A local mate's
 #     unread record is the parent watcher's re-ring ladder's to escalate.
 #   - An undelivered record (delivery_unknown, or a delivery-unknown
-#     escalation) is checked once the mate is reachable, at most every
+#     escalation) with stored text, or whose one resend already ran, is
+#     checked once the mate is reachable, at most every
 #     FM_PENDING_REPLY_DELIVERY_RECHECK_SECS: a record that landed is marked
 #     delivered; an absent one gets exactly one automatic resend under the same
 #     correlation through fm-send's FM_PENDING_REPLY_EXISTING_CORR contract,
-#     only while its stored text exists and it is younger than
+#     only while it is younger than
 #     FM_PENDING_REPLY_RESEND_MAX_AGE_SECS, because a stale instruction must
 #     not land unannounced. Once delivery is known either way, the open
 #     delivery-unknown decision is closed with the via=delivery-reconciled
@@ -1636,6 +1639,8 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
   phase=$(fm_pending_reply_get "$rec" phase)
   case "$phase" in delivery_unknown|escalated) ;; *) return 1 ;; esac
   case "$(fm_pending_reply_get "$rec" delivery_reconcile)" in landed|absent) return 1 ;; esac
+  text_path=$(fm_pending_reply_undelivered_text_path "$state" "$corr")
+  [ -f "$text_path" ] || [ -n "$(fm_pending_reply_get "$rec" delivery_resend_epoch)" ] || return 1
   now=$(fm_pending_reply_now)
   checked=$(fm_pending_reply_get "$rec" delivery_checked_epoch)
   recheck=$(fm_pending_reply_tunable "${FM_PENDING_REPLY_DELIVERY_RECHECK_SECS:-}" "$FM_PENDING_REPLY_DELIVERY_RECHECK_DEFAULT")
@@ -1655,7 +1660,6 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
   [ -z "$failed" ] || fm_pending_reply_set "$rec" delivery_read_failed_epoch "" || true
   fm_pending_reply_set "$rec" delivery_checked_epoch "$now" || return 1
   corr_state=$(fm_pending_reply_inbox_field "$status" corr_state)
-  text_path=$(fm_pending_reply_undelivered_text_path "$state" "$corr")
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
   # Deliberately undirected: see fm_pending_reply_maybe_escalate.
@@ -1673,7 +1677,7 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
   created=$(fm_pending_reply_get "$rec" created_epoch)
   max_age=$(fm_pending_reply_tunable "${FM_PENDING_REPLY_RESEND_MAX_AGE_SECS:-}" "$FM_PENDING_REPLY_RESEND_MAX_AGE_DEFAULT")
   parent_home=$(fm_pending_reply_get "$rec" parent_home)
-  if [ -n "$(fm_pending_reply_get "$rec" delivery_resend_epoch)" ] || [ ! -f "$text_path" ] \
+  if [ -n "$(fm_pending_reply_get "$rec" delivery_resend_epoch)" ] \
     || [ -z "$parent_home" ] || [ ! -d "$parent_home" ] \
     || case "$created" in ''|*[!0-9]*) true ;; *) [ $((now - created)) -gt "$max_age" ] ;; esac; then
     # Never landed and no resend is due: stop checking. The open escalation

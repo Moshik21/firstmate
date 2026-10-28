@@ -1077,13 +1077,13 @@ test_remote_undelivered_check_honours_spacing_text_and_age_limits() {
   [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 1 ] \
     || fail "a check at the end of the spacing must resend the unlanded record"
 
-  # Without the stored text there is nothing to resend: checking just stops.
+  # Without the stored text the record is left to the printed resend command.
   corr=$(send_remote_request "$fb" "$home" "$ssh_log" 14000 "textless request" FM_FAKE_SSH_RC=255)
   rec=$(fm_pending_reply_path "$home/state" "$corr")
   rm -f "$(fm_pending_reply_undelivered_text_path "$home/state" "$corr")"
   tracker_pass "$fb" "$home" "$ssh_log" 14001
-  [ "$(fm_pending_reply_get "$rec" delivery_reconcile)" = absent ] \
-    || fail "a record without stored text must end as absent: $(cat "$rec")"
+  [ -z "$(fm_pending_reply_get "$rec" delivery_reconcile)" ] \
+    || fail "a record without stored text must not be reconciled: $(cat "$rec")"
   [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 1 ] \
     || fail "a record without stored text must not be resent"
 
@@ -1172,6 +1172,46 @@ test_remote_definitely_failed_resend_stays_tracked_and_escalates() {
   open=$(status_open_decisions "$status" | cut -f1)
   [ "$open" = "pending-reply-$corr" ] || fail "the delivery-unknown decision must stay open, got '$open'"
   pass "fm-pending-reply remote: a resend refused outright stays tracked and escalates as delivery-unknown"
+}
+
+# A --resolve-key answer whose transport was lost twice is left to its printed
+# resend command, the only send that closes the answered key: the tracker
+# neither resends it nor closes its delivery-unknown decision.
+test_remote_unconfirmed_resolve_key_answer_is_left_to_the_printed_resend() {
+  local dir fb ssh_log home rhome corr rec status open
+  dir="$TMP_ROOT/remote-resend-keyed"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-resend-keyed)
+  home=$(setup_remote_parent_home remote-resend-keyed "$rhome")
+  status="$home/state/rsm.status"
+  printf 'needs-decision [key=upgrade-window]: tonight or the weekend\n' > "$status"
+  send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_NOW=19000 FM_FAKE_SSH_RC=255 \
+    "$SEND" rsm --resolve-key upgrade-window "the weekend, freeze Friday" >/dev/null 2>&1 || true
+  corr=$(fm_pending_reply_get "$(pending_record "$home")" corr_id)
+  [ -n "$corr" ] || fail "the keyed answer did not leave a pending-reply record"
+  rec=$(fm_pending_reply_path "$home/state" "$corr")
+  [ "$(fm_pending_reply_get "$rec" phase)" = delivery_unknown ] \
+    || fail "a keyed answer refused twice must be delivery_unknown: $(cat "$rec")"
+
+  tracker_pass "$fb" "$home" "$ssh_log" 19010 FM_FAKE_SSH_RC=255
+  [ "$(fm_pending_reply_get "$rec" phase)" = escalated ] \
+    || fail "the unknown keyed answer must escalate: $(cat "$rec")"
+
+  # Reachable again and past every spacing: still no reconciliation.
+  tracker_pass "$fb" "$home" "$ssh_log" 19700
+  tracker_pass "$fb" "$home" "$ssh_log" 20400
+  [ "$(remote_inbox_records "$rhome" | grep -c . || true)" = 0 ] \
+    || fail "the tracker must not resend a keyed answer"
+  [ -z "$(fm_pending_reply_get "$rec" delivery_reconcile)" ] \
+    || fail "the tracker must not reconcile a keyed answer: $(cat "$rec")"
+  [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
+    || fail "a keyed answer that never landed must not claim delivery: $(cat "$rec")"
+  [ "$(fm_pending_reply_get "$rec" phase)" = escalated ] \
+    || fail "the keyed answer's record must stay escalated: $(cat "$rec")"
+  open=$(status_open_decisions "$status" | cut -f1 | sort | tr '\n' ' ')
+  [ "$open" = "pending-reply-$corr upgrade-window " ] \
+    || fail "the answered key and the delivery-unknown decision must both stay open, got '$open'"
+  pass "fm-pending-reply remote: an unconfirmed --resolve-key answer is left to its printed resend"
 }
 
 # Review finding on the finding-2 fix: a failed read must be retried soon, but
@@ -1354,6 +1394,7 @@ test_remote_unlanded_record_is_resent_once_and_recheck_is_not_delayed_by_a_faile
 test_remote_undelivered_check_honours_spacing_text_and_age_limits
 test_remote_failed_resend_is_never_repeated
 test_remote_definitely_failed_resend_stays_tracked_and_escalates
+test_remote_unconfirmed_resolve_key_answer_is_left_to_the_printed_resend
 test_remote_failed_inbox_read_retries_after_the_short_backoff_only
 test_remote_copy_without_the_inbox_status_leg_is_probed_at_the_short_spacing
 test_remote_silent_host_cannot_hold_the_tracker_past_the_read_budget

@@ -495,6 +495,7 @@ That command preserves the request body and lets the remote enqueue deduplicate 
 A plain rerun mints a different correlation and is not idempotent.
 When deduplication finds that the worker already moved the matching record into `handled/`, the resend exits successfully without ringing the doorbell again.
 Once the mate is reachable again, the parent's reply tracker checks the remote inbox for an unconfirmed request itself: a record that landed is marked delivered, and a recent one that never landed is resent once under the same correlation.
+An unconfirmed `--resolve-key` answer is left to its printed resend command, which is what closes the answered keys.
 The [`fm-pending-reply-lib.sh` header](../bin/fm-pending-reply-lib.sh) owns that reconciliation and its age bound.
 
 ### Swallowed doorbells
