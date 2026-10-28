@@ -1,0 +1,33 @@
+### 20:42:33 epoch=1793158953 open decision q-color seeded; host DOWN; fm-send.sh rsm --resolve-key q-color 'use blue'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-live.w1ykVY/phome
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+ssh: connect to host 127.0.0.1 port 24547: Connection refused
+ssh: connect to host 127.0.0.1 port 24547: Connection refused
+error: steer to remote secondmate rsm is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+FM_HOME=/tmp/fm-live.w1ykVY/phome FM_PENDING_REPLY_EXISTING_CORR=d156ede907df6cfa /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M608W6WT11F619CNEDYYDQXN/bin/fm-send.sh rsm --resolve-key q-color use\ blue
+fm-send rc=1
+--- pending-replies dir: .delivery-confirmed-d156ede907df6cfa d156ede907df6cfa 
+### 20:42:35 epoch=1793158955 host BACK UP; tick, wait past backoff, tick, tick
+delivered_epoch=
+phase=escalated
+remote records: 0
+blocked [key=q-color] [at=1793158953]: which color should the banner be?
+blocked [key=pending-reply-d156ede907df6cfa] [at=1793158956]: pending-reply-delivery-unknown: task=rsm pending-reply-id=d156ede907df6cfa request=use blue
+### 20:43:52 operator runs the printed resend (host up)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-live.w1ykVY/phome
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+notice: doorbell not typed because the agent in fm-remote:p1 has exited; the steer is durably recorded at /tmp/fm-live.w1ykVY/rhome/state/parent-route/rsm.inbox/001.msg for recovery
+rc=0
+remote records: 1
+blocked [key=q-color] [at=1793158953]: which color should the banner be?
+blocked [key=pending-reply-d156ede907df6cfa] [at=1793158956]: pending-reply-delivery-unknown: task=rsm pending-reply-id=d156ede907df6cfa request=use blue
+resolved [key=q-color] [at=1793159036]: answered: use blue
+open decisions:
+pending-reply-d156ede907df6cfa	blocked	pending-reply-delivery-unknown: task=rsm pending-reply-id=d156ede907df6cfa request=use blue### 20:44:03 tracker tick after the manual resend
+phase=awaiting_report
+delivered_epoch=1793159036
+open decisions:
+pending-reply-d156ede907df6cfa	blocked	pending-reply-delivery-unknown: task=rsm pending-reply-id=d156ede907df6cfa request=use blue### 20:44:13 mate's correlated report; tracker tick
+phase=resolved
+resolved_via=status
+open decisions:

@@ -1,0 +1,143 @@
+### 20:39:32 epoch=1793158772 host DOWN (lab sshd stopped). fm-send.sh rsm 'please append one line'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-live.w1ykVY/phome
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ssh: connect to host 127.0.0.1 port 24547: Connection refused
+ssh: connect to host 127.0.0.1 port 24547: Connection refused
+error: steer to remote secondmate rsm is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+FM_HOME=/tmp/fm-live.w1ykVY/phome FM_PENDING_REPLY_EXISTING_CORR=1b44cfa5a23d27a0 /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M608W6WT11F619CNEDYYDQXN/bin/fm-send.sh rsm please\ append\ one\ line
+fm-send rc=1
+--- record /tmp/fm-live.w1ykVY/phome/state/pending-replies/1b44cfa5a23d27a0
+schema=fm-pending-reply.v1
+corr_id=1b44cfa5a23d27a0
+task_id=rsm
+parent_home=/tmp/fm-live.w1ykVY/phome
+parent_status=/tmp/fm-live.w1ykVY/phome/state/rsm.status
+parent_status_scan_signature=
+request_summary=please append one line
+created_epoch=1793158773
+delivered_epoch=
+turn_seen_busy=0
+request_turn_completed_epoch=
+recovery_attempted_epoch=
+recovery_sender_pid=
+recovery_sender_identity=
+recovery_sent_epoch=
+recovery_delivery_outcome=
+recovery_turn_seen_busy=0
+recovery_turn_completed_epoch=
+escalated_epoch=
+resolved_epoch=
+resolved_via=
+wrong_home_hits=0
+wrong_home_first_sighting=
+wrong_home_sightings=
+wrong_home_scan_signature=
+grace_secs=120
+phase=delivery_unknown
+--- pending-replies dir:
+.delivery-confirmed-1b44cfa5a23d27a0
+.undelivered-text-1b44cfa5a23d27a0
+1b44cfa5a23d27a0
+--- parent rsm.status:
+--- remote inbox:
+### 20:39:33 epoch=1793158773 tracker tick #1, host still DOWN
+tick rc=0
+--- record /tmp/fm-live.w1ykVY/phome/state/pending-replies/1b44cfa5a23d27a0
+schema=fm-pending-reply.v1
+corr_id=1b44cfa5a23d27a0
+task_id=rsm
+parent_home=/tmp/fm-live.w1ykVY/phome
+parent_status=/tmp/fm-live.w1ykVY/phome/state/rsm.status
+parent_status_scan_signature=
+request_summary=please append one line
+created_epoch=1793158773
+delivered_epoch=
+turn_seen_busy=0
+request_turn_completed_epoch=
+recovery_attempted_epoch=
+recovery_sender_pid=
+recovery_sender_identity=
+recovery_sent_epoch=
+recovery_delivery_outcome=
+recovery_turn_seen_busy=0
+recovery_turn_completed_epoch=
+resolved_epoch=
+resolved_via=
+wrong_home_hits=0
+wrong_home_first_sighting=
+wrong_home_sightings=
+wrong_home_scan_signature=
+grace_secs=120
+delivery_read_failed_epoch=1793158773
+escalated_epoch=1793158773
+phase=escalated
+--- pending-replies dir:
+.delivery-confirmed-1b44cfa5a23d27a0
+.undelivered-text-1b44cfa5a23d27a0
+1b44cfa5a23d27a0
+--- parent rsm.status:
+blocked [key=pending-reply-1b44cfa5a23d27a0] [at=1793158773]: pending-reply-delivery-unknown: task=rsm pending-reply-id=1b44cfa5a23d27a0 request=please append one line
+--- remote inbox:
+### 20:39:44 epoch=1793158784 host BACK UP: starting lab sshd
+### 20:39:45 epoch=1793158785 tracker tick #2 (inside the 60 s short read-retry backoff)
+recovery_delivery_outcome=
+delivery_read_failed_epoch=1793158773
+phase=escalated
+--- remote inbox:
+waiting 50s (real clock) to pass the short backoff, far inside the 600 s recheck spacing
+### 20:40:35 epoch=1793158835 tracker tick #3 (short backoff elapsed, host reachable)
+tick rc=0
+--- record /tmp/fm-live.w1ykVY/phome/state/pending-replies/1b44cfa5a23d27a0
+schema=fm-pending-reply.v1
+corr_id=1b44cfa5a23d27a0
+task_id=rsm
+parent_home=/tmp/fm-live.w1ykVY/phome
+parent_status=/tmp/fm-live.w1ykVY/phome/state/rsm.status
+parent_status_scan_signature=
+request_summary=please append one line
+created_epoch=1793158773
+turn_seen_busy=0
+request_turn_completed_epoch=
+recovery_attempted_epoch=
+recovery_sender_pid=
+recovery_sender_identity=
+recovery_sent_epoch=
+recovery_delivery_outcome=
+recovery_turn_seen_busy=0
+recovery_turn_completed_epoch=
+resolved_epoch=
+resolved_via=
+wrong_home_hits=0
+wrong_home_first_sighting=
+wrong_home_sightings=
+wrong_home_scan_signature=
+grace_secs=120
+escalated_epoch=1793158773
+delivery_read_failed_epoch=
+delivery_checked_epoch=1793158835
+delivery_resend_epoch=1793158835
+delivery_reconcile=resent
+phase=awaiting_report
+delivered_epoch=1793158840
+escalation_closed_epoch=1793158840
+--- pending-replies dir:
+1b44cfa5a23d27a0
+--- parent rsm.status:
+blocked [key=pending-reply-1b44cfa5a23d27a0] [at=1793158773]: pending-reply-delivery-unknown: task=rsm pending-reply-id=1b44cfa5a23d27a0 request=please append one line
+resolved [key=pending-reply-1b44cfa5a23d27a0] [at=1793158840]: pending-reply-resolved: task=rsm pending-reply-id=1b44cfa5a23d27a0 via=delivery-reconciled resent
+--- remote inbox:
+/tmp/fm-live.w1ykVY/rhome/state/parent-route/rsm.inbox/001.msg:
+schema=fm-task-inbox.v1
+at=2026-10-28T03:40:40Z
+body-terminator=1
+--
+[fm-from-firstmate]⁣corr=1b44cfa5a23d27a0 please append one line
+
+### 20:40:52 epoch=1793158852 tracker tick #4 (later pass): must not resend again
+remote inbox .msg count: 1  resend_epoch: delivery_resend_epoch=1793158835

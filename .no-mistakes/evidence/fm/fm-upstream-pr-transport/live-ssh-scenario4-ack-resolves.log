@@ -1,0 +1,22 @@
+### 20:40:55 epoch=1793158855 parent reads remote inbox over real ssh: fm-on.sh rsm fm-remote-secondmate-control.sh inbox-status rsm 1b44cfa5a23d27a0
+schema=fm-inbox-status.v1
+unhandled=1
+oldest_age=16
+corr_state=unhandled
+composer=unknown
+### 20:40:56 epoch=1793158856 mate acknowledges: record moves to handled/
+schema=fm-inbox-status.v1
+unhandled=0
+oldest_age=
+corr_state=handled
+composer=unknown
+### 20:40:58 epoch=1793158858 mate's correlated report on the parent status channel
+### 20:40:58 epoch=1793158858 tracker tick
+delivery_reconcile=resent
+phase=resolved
+resolved_epoch=1793158860
+resolved_via=status
+1b44cfa5a23d27a0
+blocked [key=pending-reply-1b44cfa5a23d27a0] [at=1793158773]: pending-reply-delivery-unknown: task=rsm pending-reply-id=1b44cfa5a23d27a0 request=please append one line
+resolved [key=pending-reply-1b44cfa5a23d27a0] [at=1793158840]: pending-reply-resolved: task=rsm pending-reply-id=1b44cfa5a23d27a0 via=delivery-reconciled resent
+done corr=1b44cfa5a23d27a0 at=1793158858: read and appended

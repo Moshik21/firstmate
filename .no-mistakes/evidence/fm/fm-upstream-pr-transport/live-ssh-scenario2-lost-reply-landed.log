@@ -1,0 +1,34 @@
+### 20:41:12 epoch=1793158872 host up, reply LOST after remote execution (both attempts): fm-send.sh rsm 'please append one line'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-live.w1ykVY/phome
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+notice: doorbell not typed because the agent in fm-remote:p1 has exited; the steer is durably recorded at /tmp/fm-live.w1ykVY/rhome/state/parent-route/rsm.inbox/001.msg for recovery
+notice: doorbell not typed because the agent in fm-remote:p1 has exited; the steer is durably recorded at /tmp/fm-live.w1ykVY/rhome/state/parent-route/rsm.inbox/001.msg for recovery
+error: steer to remote secondmate rsm is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+FM_HOME=/tmp/fm-live.w1ykVY/phome FM_PENDING_REPLY_EXISTING_CORR=98390cfbe61462e5 /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M608W6WT11F619CNEDYYDQXN/bin/fm-send.sh rsm please\ append\ one\ line
+fm-send rc=1
+--- record /tmp/fm-live.w1ykVY/phome/state/pending-replies/98390cfbe61462e5
+delivered_epoch=
+phase=delivery_unknown
+--- pending-replies dir:
+.delivery-confirmed-98390cfbe61462e5
+.undelivered-text-98390cfbe61462e5
+--- parent rsm.status:
+--- remote inbox:
+/tmp/fm-live.w1ykVY/rhome/state/parent-route/rsm.inbox/001.msg:
+[fm-from-firstmate]⁣corr=98390cfbe61462e5 please append one line
+### 20:41:16 epoch=1793158876 host goes DOWN; tracker tick #1
+delivery_read_failed_epoch=1793158877
+phase=escalated
+blocked [key=pending-reply-98390cfbe61462e5] [at=1793158877]: pending-reply-delivery-unknown: task=rsm pending-reply-id=98390cfbe61462e5 request=please append one line
+remote records after two lost-reply attempts: 1
+### 20:41:27 epoch=1793158887 host BACK UP
+### 20:42:19 epoch=1793158939 tracker tick #2 after short backoff
+delivery_checked_epoch=1793158939
+delivered_epoch=1793158939
+delivery_reconcile=landed
+phase=awaiting_report
+escalation_closed_epoch=1793158939
+--- pending-replies dir: 98390cfbe61462e5 
+remote records: 1
+blocked [key=pending-reply-98390cfbe61462e5] [at=1793158877]: pending-reply-delivery-unknown: task=rsm pending-reply-id=98390cfbe61462e5 request=please append one line
+resolved [key=pending-reply-98390cfbe61462e5] [at=1793158941]: pending-reply-resolved: task=rsm pending-reply-id=98390cfbe61462e5 via=delivery-reconciled landed
