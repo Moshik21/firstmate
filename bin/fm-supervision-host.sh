@@ -532,6 +532,7 @@ boundary_reached() {
     log_line "quiet-boundary\tafter ${PARK_ELAPSED}s; watcher retained"
     HOST_STARTED_SECONDS=$SECONDS
     PARK_ELAPSED=0
+    WARM_COMPACT_LAST_TICK=-1
     return 1
   fi
   [ "$PARK_ELAPSED" -ge "$PARK_SECONDS" ]

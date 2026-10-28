@@ -207,7 +207,19 @@ fi
 
 [ -n "$SESSION" ] && capable || exit 0
 [ ! -e "$STATE/.afk" ] && fm_supervision_needed "$STATE" || exit 0
-fm_lock_try_acquire "$CLAIM" || exit 0
+if ! fm_lock_try_acquire "$CLAIM"; then
+  # A park that has just delivered this session's wake holds the claim until
+  # its EXIT cleanup; the woken turn's Stop waits for it (about 3s) to rearm.
+  holder=$FM_LOCK_HELD_PID
+  jq -e --arg session "$SESSION" --arg pid "$holder" \
+    '.session == $session and .outcome == "delivered" and (.pid | tostring) == $pid' \
+    "$RECORD" >/dev/null 2>&1 && fm_pid_alive "$holder" || exit 0
+  for _ in $(seq 30); do
+    [ -e "$CLAIM" ] || [ -L "$CLAIM" ] || break
+    sleep 0.1
+  done
+  fm_lock_try_acquire "$CLAIM" || exit 0
+fi
 OWNED=1
 trap cleanup EXIT
 trap 'record interrupted; exit 0' HUP INT TERM

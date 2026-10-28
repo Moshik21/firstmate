@@ -271,6 +271,46 @@ test_single_flight_claim_admits_one_park() {
   pass "the single-flight claim admits one park, which delivers its wake through the native queue"
 }
 
+# A park that has delivered a wake still holds the claim until its EXIT
+# cleanup. The holder here is that park's state: a live claim and a delivered
+# record naming it, released a second after the woken turn's Stop starts.
+test_stop_rearms_after_a_delivering_park_releases_its_claim() {
+  local home out holder
+  home=$(make_home delivered-claim opted-in)
+  printf 'wake\n' > "$home/arm-mode"
+  cat > "$home/holder.sh" <<'SH'
+. "$1/fm-wake-lib.sh"
+STATE=$FM_HOME/state
+fm_lock_try_acquire "$STATE/.codex-park.lock" || exit 1
+jq -n --arg session "$SESSION_ID" --argjson pid "$$" \
+  '{session:$session,pid:$pid,at:0,outcome:"delivered"}' > "$STATE/.codex-park.json"
+echo "$$" > "$FM_HOME/holder.pid"
+sleep 1
+fm_lock_release "$STATE/.codex-park.lock"
+SH
+  out=$(under_codex "$home" "$REGISTER"'
+    bash "$FM_HOME/holder.sh" "$(dirname "$PARK")" &
+    holder=$!
+    i=0
+    until [ -s "$FM_HOME/holder.pid" ]; do
+      i=$((i + 1)); [ "$i" -lt 100 ] || { echo "holder never claimed"; break; }
+      sleep 0.05
+    done
+    printf "%s" "$PAYLOAD" | "$PARK"; echo "stop=$?"
+    wait "$holder"; echo "holder=$?"
+  ' 2>&1)
+  holder=$(cat "$home/holder.pid" 2>/dev/null)
+  assert_not_contains "$out" "holder never claimed" "fixture: $out"
+  assert_contains "$out" "holder=0" "fixture: the delivering holder must release its claim: $out"
+  assert_contains "$out" "stop=0" "the woken turn's Stop must rearm and deliver cleanly: $out"
+  assert_equals 1 "$(arm_count "$home")" "the woken turn's Stop must rearm once the delivering park releases its claim"
+  assert_equals 1 "$(queue_count "$home")" "the rearmed park must deliver its own wake and no recovery notice"
+  assert_equals delivered "$(outcome "$home")" "the rearmed park must record its delivered wake"
+  [ "$(jq -r .pid "$home/state/.codex-park.json")" != "$holder" ] \
+    || fail "the delivered record must belong to the rearmed park, not the earlier holder"
+  pass "a Stop that meets a delivering park's claim waits for its release and rearms"
+}
+
 test_failed_queue_delivery_latches_fallback() {
   local home out
   home=$(make_home queue-failure opted-in)
@@ -341,13 +381,24 @@ test_watcher_exits_when_its_park_owner_is_gone() {
 }
 
 # The real host under the model-free Codex owner keeps one watcher across
-# repeated quiet boundaries instead of ending its park.
+# repeated quiet boundaries instead of ending its park, and its warm-compaction
+# tick follows the restarted clock. The tick interval equals the park interval,
+# so a tick left on the old clock never comes due again; the engine record is
+# seeded only after a quiet boundary, so its compaction must run on the new
+# clock. The engine stub fails, which still counts as an attempted compaction.
 test_host_quiet_boundary_retains_the_watcher() {
-  local home host first_watcher i
+  local home host first_watcher i key
   home=$(make_home quiet-boundary plain)
-  : > "$home/config/supervision-host"
+  printf 'claude sonnet\n' > "$home/config/supervision-host"
+  printf 'idle-seconds=60\nmin-context-tokens=1000\n' > "$home/config/warm-compact"
+  mkdir -p "$home/claude/projects/p"
+  printf '{"type":"assistant","message":{"usage":{"input_tokens":1,"cache_read_input_tokens":90000,"cache_creation_input_tokens":0}}}\n' \
+    > "$home/claude/projects/p/warm-sess.jsonl"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s/engine-calls"\nexit 1\n' "$home" > "$home/engine-stub"
+  chmod +x "$home/engine-stub"
   env FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     FM_SUPERVISION_HOST_PRIMARY=codex FM_SUPERVISION_HOST_PARK_SECONDS=2 FM_CODEX_MODEL_FREE_PARK=1 \
+    FM_WARM_COMPACT_TICK=2 CLAUDE_CONFIG_DIR="$home/claude" FM_SUPERVISION_ENGINE_CLAUDE_BIN="$home/engine-stub" \
     "$FAKE_CODEX" -c 'printf "%s\n" "$PPID" > "$FM_HOME/state/.lock"
       printf "%s\n" "$$" > "$FM_HOME/host.pid"
       exec "$1" park' _ "$ROOT/bin/fm-supervision-host.sh" > "$home/host.out" 2> "$home/host.err" &
@@ -359,13 +410,28 @@ test_host_quiet_boundary_retains_the_watcher() {
   host=$(cat "$home/host.pid")
   first_watcher=$(cat "$home/state/.watch.lock/pid")
   i=0
-  until [ "$(grep -c 'quiet-boundary' "$home/state/.supervision-host.log" 2>/dev/null)" -ge 2 ]; do
+  until grep -q 'quiet-boundary' "$home/state/.supervision-host.log" 2>/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 150 ] || fail "the host never logged a quiet boundary: $(cat "$home/host.out")"
+    sleep 0.1
+  done
+  key=$(FM_HOME="$home" bash -c '. "$1"; . "$2"; fm_supervision_host_main_key "$3"' _ \
+    "$ROOT/bin/fm-wake-lib.sh" "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/state") \
+    || fail "fixture: no main-session key"
+  printf 'engine=claude\nmodel=sonnet\nsession=warm-sess\nkey=%s\nturns=1\nconversation_cost=0\nended=%s\n' \
+    "$key" $(($(date +%s) - 600)) > "$home/state/.supervision-host-engine"
+  printf 'prompt\n' > "$home/state/.supervision-host-prompt"
+  i=0
+  until [ "$(grep -c 'quiet-boundary' "$home/state/.supervision-host.log" 2>/dev/null)" -ge 3 ] \
+    && grep -q 'warm-compact	engine' "$home/state/.supervision-host.log" 2>/dev/null; do
     i=$((i + 1)); [ "$i" -lt 150 ] || break
     sleep 0.1
   done
+  grep -q 'warm-compact	engine	failed' "$home/state/.supervision-host.log" 2>/dev/null \
+    || fail "the warm-compaction tick did not run on the clock a quiet boundary restarted: $(cat "$home/state/.supervision-host.log")"
+  assert_contains "$(cat "$home/engine-calls" 2>/dev/null)" "/compact" "the compaction must resume the engine conversation"
   kill -0 "$host" 2>/dev/null || fail "the host ended its park at a quiet boundary: $(cat "$home/host.out")"
-  [ "$(grep -c 'quiet-boundary' "$home/state/.supervision-host.log" 2>/dev/null)" -ge 2 ] \
-    || fail "the host never logged two quiet boundaries: $(cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  [ "$(grep -c 'quiet-boundary' "$home/state/.supervision-host.log" 2>/dev/null)" -ge 3 ] \
+    || fail "the host never logged three quiet boundaries: $(cat "$home/state/.supervision-host.log" 2>/dev/null)"
   assert_equals "$first_watcher" "$(cat "$home/state/.watch.lock/pid" 2>/dev/null)" \
     "the same watcher must survive the quiet boundaries"
   kill -0 "$first_watcher" 2>/dev/null || fail "the retained watcher must still be running"
@@ -373,12 +439,13 @@ test_host_quiet_boundary_retains_the_watcher() {
   kill "$host" 2>/dev/null
   i=0
   while kill -0 "$host" 2>/dev/null && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
-  pass "the model-free Codex host keeps one watcher across quiet boundaries with no model output"
+  pass "the model-free Codex host keeps one watcher across quiet boundaries with no model output and warm-compacts on the restarted clock"
 }
 
 test_unconfigured_home_keeps_the_foreground_checkpoint
 test_version_gate_selects_only_the_verified_cli
 test_single_flight_claim_admits_one_park
+test_stop_rearms_after_a_delivering_park_releases_its_claim
 test_failed_queue_delivery_latches_fallback
 test_repeated_arm_failure_latches_fallback
 test_watcher_exits_when_its_park_owner_is_gone
