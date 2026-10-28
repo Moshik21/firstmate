@@ -1,0 +1,15 @@
+## after first turn end (real codex-cli 0.163.0, lab FM_HOME with config/codex-stop-park)
+session file:
+01a18258-8af1-7020-affd-7ae48cf0885e
+2308367
+lock holder:
+2308367
+
+park record:
+{"session":"01a18258-8af1-7020-affd-7ae48cf0885e","identity":"linux-starttime=64759412 cmdline-hex=62617368002f746d702f666d2d6c61622d726f6f742e345636476b302f666d2f62696e2f666d2d636f6465782d73746f702d7061726b2e736800","anchor":"2308367","pid":2328810,"at":1793188216,"outcome":"waiting"}
+fallback latch present: no
+park/arm/watcher processes:
+2328810 2308367 bash /tmp/fm-lab-root.4V6Gk0/fm/bin/fm-codex-stop-park.sh
+2330725 2328810 perl -MPOSIX=WNOHANG,setpgid -MTime::HiRes=time -e        my ($bound, $grace, $owner, $shell_parent) = (shift, shift, shift,
+2330746 2330725 bash /tmp/fm-lab-root.4V6Gk0/fm/bin/fm-watch-arm.sh
+2330817 2330746 bash /tmp/fm-lab-root.4V6Gk0/fm/bin/fm-watch.sh

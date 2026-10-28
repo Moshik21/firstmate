@@ -1,0 +1,9 @@
+## before /quit
+2530770 2308367 bash /tmp/fm-lab-root.4V6Gk0/fm/bin/fm-codex-stop-park.sh
+2531704 2530770 perl -MPOSIX=WNOHANG,setpgid -MTime::HiRes=time -e        my ($bound, $grace, $owner
+2531728 2531704 bash /tmp/fm-lab-root.4V6Gk0/fm/bin/fm-watch-arm.sh
+2531782 2531728 bash /tmp/fm-lab-root.4V6Gk0/fm/bin/fm-watch.sh
+## 12s after /quit
+no server running on /tmp/fm-lab.swLFnI/tmux/tmux-1000/fm-lab
+lab park/arm/watcher processes remaining:
+(end)
