@@ -840,11 +840,16 @@ tracker_inbox_status() {  # <fakebin> <home> <ssh-log> <now> <corr>
 
 # A request sent to the remote mate at epoch <now>; prints its correlation id.
 send_remote_request() {  # <fakebin> <home> <ssh-log> <now> <text> [extra env...]
-  local fb=$1 home=$2 ssh_log=$3 now=$4 text=$5
+  local fb=$1 home=$2 ssh_log=$3 now=$4 text=$5 before rec
   shift 5
+  # A home can already hold earlier records, and find's order is the
+  # filesystem's: report the record this send created, not the first listed.
+  before=$(find "$home/state/pending-replies" -maxdepth 1 -type f ! -name '.*' 2>/dev/null)
   send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_NOW="$now" "$@" \
     "$SEND" rsm "$text" >/dev/null 2>&1 || true
-  fm_pending_reply_get "$(pending_record "$home")" corr_id
+  rec=$(find "$home/state/pending-replies" -maxdepth 1 -type f ! -name '.*' 2>/dev/null \
+    | grep -vxF -e "${before:-/nonexistent}" | head -1)
+  fm_pending_reply_get "$rec" corr_id
 }
 
 # Scenario 1: a delivered request the parked mate never reads.
