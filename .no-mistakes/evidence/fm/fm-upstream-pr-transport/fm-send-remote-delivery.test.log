@@ -23,13 +23,11 @@ ok - fm-pending-reply remote: an unlanded record is resent once, the first faile
 ok - fm-pending-reply remote: the undelivered check honours its spacing, needs stored text, and stops at the age limit
 ok - fm-pending-reply remote: a resend that failed is never repeated
 ok - fm-pending-reply remote: a resend refused outright stays tracked and escalates as delivery-unknown
+ok - fm-pending-reply remote: an unconfirmed --resolve-key answer is left to its printed resend
 ok - fm-pending-reply remote: a failed inbox read is retried after the short backoff and not before
 ok - fm-pending-reply remote: a remote copy without the inbox-status leg is probed at the short spacing
 ok - fm-pending-reply remote: a silent host is cut off at the inbox read budget
 ok - fm-pending-reply remote: the resend lands in the remote inbox and the acknowledgement resolves the record
 ok - fm-remote-secondmate-control inbox-status: schema, unhandled count, three correlation states, bad correlation refused
 all fm-send-remote-delivery tests passed
-
-real	1m19.687s
-user	0m41.723s
-sys	0m31.823s
+exit=0

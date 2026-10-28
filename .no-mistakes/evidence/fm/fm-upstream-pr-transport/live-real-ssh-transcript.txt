@@ -1,0 +1,259 @@
+
+=== S1+S4: host down at send; failed read uses short backoff; host back -> one resend lands; ack resolves
+  [host] sshd stopped (port closed)
+  fm-send exit                 1
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab-ssh.R7GPOX/s1-phome
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the requested message WILL still be sent.
+  | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ssh: connect to host 127.0.0.1 port 54585: Connection refused
+  | ssh: connect to host 127.0.0.1 port 54585: Connection refused
+  | error: steer to remote secondmate rsm is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+  | FM_HOME=/tmp/fm-lab-ssh.R7GPOX/s1-phome FM_PENDING_REPLY_EXISTING_CORR=4995d0be8fffdb16 /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M5ZWDJCTCFMYH4M8EBS97HS5/bin/fm-send.sh rsm please\ append\ one\ line\ \(s1\)
+  corr                         4995d0be8fffdb16
+  phase                        delivery_unknown
+  delivered_epoch              
+  delivery_checked_epoch       
+  delivery_read_failed_epoch   
+  delivery_reconcile           
+  delivery_resend_epoch        
+  resolved_via                 
+  stored undelivered text      present
+  remote inbox unhandled       0
+  remote inbox handled         0
+  open decisions               
+  [tracker] tick at now=1793146431 took 0s
+  ssh calls this tick          1
+  phase                        escalated
+  delivered_epoch              
+  delivery_checked_epoch       
+  delivery_read_failed_epoch   1793146431
+  delivery_reconcile           
+  delivery_resend_epoch        
+  resolved_via                 
+  stored undelivered text      present
+  remote inbox unhandled       0
+  remote inbox handled         0
+  open decisions               pending-reply-4995d0be8fffdb16 
+  [tracker] tick at now=1793146461 took 0s
+  ssh calls (30s after failed read, inside 60s backoff) 0
+  [host] sshd started pid=1054721
+  [tracker] tick at now=1793146492 took 15s
+  ssh calls (61s after failed read, host back; << 600s recheck) 2
+  phase                        awaiting_report
+  delivered_epoch              1793146492
+  delivery_checked_epoch       1793146492
+  delivery_read_failed_epoch   
+  delivery_reconcile           resent
+  delivery_resend_epoch        1793146492
+  resolved_via                 
+  stored undelivered text      absent
+  remote inbox unhandled       1
+  remote inbox handled         0
+  open decisions               
+  remote record                /tmp/fm-lab-ssh.R7GPOX/s1-rhome/state/parent-route/rsm.inbox/001.msg
+  > schema=fm-task-inbox.v1
+  > at=2026-10-28T00:13:20Z
+  > body-terminator=1
+  > --
+  > [fm-from-firstmate]⁣corr=4995d0be8fffdb16 please append one line (s1)
+  status: blocked [key=pending-reply-4995d0be8fffdb16] [at=1793146394]: pending-reply-delivery-unknown: task=rsm pending-reply-id=4995d0be8fffdb16 request=please append one line (s1)
+  status: resolved [key=pending-reply-4995d0be8fffdb16] [at=1793146410]: pending-reply-resolved: task=rsm pending-reply-id=4995d0be8fffdb16 via=delivery-reconciled resent
+  [tracker] tick at now=1793147191 took 23s
+  after later pass: inbox unhandled 1
+  resend epoch                 1793146492
+  inbox-status: schema=fm-inbox-status.v1
+  inbox-status: unhandled=1
+  inbox-status: oldest_age=34
+  inbox-status: corr_state=unhandled
+  inbox-status: composer=unknown
+  [mate] acknowledged record -> handled/
+  inbox-status: schema=fm-inbox-status.v1
+  inbox-status: unhandled=0
+  inbox-status: oldest_age=
+  inbox-status: corr_state=handled
+  inbox-status: composer=unknown
+  [tracker] tick at now=1793147202 took 22s
+  phase                        resolved
+  delivered_epoch              1793146492
+  delivery_checked_epoch       1793146492
+  delivery_read_failed_epoch   
+  delivery_reconcile           resent
+  delivery_resend_epoch        1793146492
+  resolved_via                 status
+  stored undelivered text      absent
+  remote inbox unhandled       0
+  remote inbox handled         1
+  open decisions               
+
+=== S2: reply lost after the remote leg ran (sshd session killed after execution, twice) -> tracker reconciles landed, no resend
+  fm-send exit                 1
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab-ssh.R7GPOX/s2-phome
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the requested message WILL still be sent.
+  | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | notice: doorbell did not reach fm-remote:p-lab-nosuch; the steer is durably recorded at /tmp/fm-lab-ssh.R7GPOX/s2-rhome/state/parent-route/rsm.inbox/001.msg
+  | Connection to 127.0.0.1 closed by remote host.
+  | notice: doorbell did not reach fm-remote:p-lab-nosuch; the steer is durably recorded at /tmp/fm-lab-ssh.R7GPOX/s2-rhome/state/parent-route/rsm.inbox/001.msg
+  | Connection to 127.0.0.1 closed by remote host.
+  | error: steer to remote secondmate rsm is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+  | FM_HOME=/tmp/fm-lab-ssh.R7GPOX/s2-phome FM_PENDING_REPLY_EXISTING_CORR=ab320852f683a382 /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M5ZWDJCTCFMYH4M8EBS97HS5/bin/fm-send.sh rsm please\ append\ one\ line\ \(s2\)
+  phase                        delivery_unknown
+  delivered_epoch              
+  delivery_checked_epoch       
+  delivery_read_failed_epoch   
+  delivery_reconcile           
+  delivery_resend_epoch        
+  resolved_via                 
+  stored undelivered text      present
+  remote inbox unhandled       1
+  remote inbox handled         0
+  open decisions               
+  [tracker] tick at now=1793146411 took 3s
+  phase                        awaiting_report
+  delivered_epoch              1793146411
+  delivery_checked_epoch       1793146411
+  delivery_read_failed_epoch   
+  delivery_reconcile           landed
+  delivery_resend_epoch        
+  resolved_via                 
+  stored undelivered text      absent
+  remote inbox unhandled       1
+  remote inbox handled         0
+  open decisions               
+
+=== S3: --resolve-key answer with host down -> tracker leaves it to the printed resend
+  [host] sshd stopped (port closed)
+  fm-send exit                 1
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab-ssh.R7GPOX/s3-phome
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the requested message WILL still be sent.
+  | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ssh: connect to host 127.0.0.1 port 54585: Connection refused
+  | ssh: connect to host 127.0.0.1 port 54585: Connection refused
+  | error: steer to remote secondmate rsm is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+  | FM_HOME=/tmp/fm-lab-ssh.R7GPOX/s3-phome FM_PENDING_REPLY_EXISTING_CORR=713021b320951ef2 /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M5ZWDJCTCFMYH4M8EBS97HS5/bin/fm-send.sh rsm --resolve-key upgrade-window the\ 
+  phase                        delivery_unknown
+  delivered_epoch              
+  delivery_checked_epoch       
+  delivery_read_failed_epoch   
+  delivery_reconcile           
+  delivery_resend_epoch        
+  resolved_via                 
+  stored undelivered text      absent
+  remote inbox unhandled       0
+  remote inbox handled         0
+  open decisions               upgrade-window 
+  [tracker] tick at now=1793146401 took 0s
+  [host] sshd started pid=1404509
+  [tracker] tick at now=1793147091 took 0s
+  [tracker] tick at now=1793147791 took 0s
+  phase                        escalated
+  delivered_epoch              
+  delivery_checked_epoch       
+  delivery_read_failed_epoch   
+  delivery_reconcile           
+  delivery_resend_epoch        
+  resolved_via                 
+  stored undelivered text      absent
+  remote inbox unhandled       0
+  remote inbox handled         0
+  open decisions               upgrade-window pending-reply-713021b320951ef2 
+  printed resend               FM_HOME=/tmp/fm-lab-ssh.R7GPOX/s3-phome FM_PENDING_REPLY_EXISTING_CORR=713021b320951ef2 /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M5ZWDJCTCFMYH4M8EBS97HS5/bin/fm-send.sh rsm --resolve-key upgr
+  [operator] running the printed resend
+  printed resend exit          0
+  phase                        awaiting_report
+  delivered_epoch              1793146503
+  delivery_checked_epoch       
+  delivery_read_failed_epoch   
+  delivery_reconcile           
+  delivery_resend_epoch        
+  resolved_via                 
+  stored undelivered text      absent
+  remote inbox unhandled       1
+  remote inbox handled         0
+  open decisions               pending-reply-713021b320951ef2 
+
+=== S5: resend refused definitively (remote inbox unwritable -> remote leg exits non-255) -> record stays tracked, escalates delivery-unknown
+  [host] sshd stopped (port closed)
+  fm-send exit                 1
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab-ssh.R7GPOX/s5-phome
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the requested message WILL still be sent.
+  | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ssh: connect to host 127.0.0.1 port 54585: Connection refused
+  | ssh: connect to host 127.0.0.1 port 54585: Connection refused
+  | error: steer to remote secondmate rsm is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+  | FM_HOME=/tmp/fm-lab-ssh.R7GPOX/s5-phome FM_PENDING_REPLY_EXISTING_CORR=7cff0a7e38fd74a1 /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M5ZWDJCTCFMYH4M8EBS97HS5/bin/fm-send.sh rsm please\ append\ one\ line\ \(s5\)
+  [host] sshd started pid=1463489
+  [tracker] tick at now=1793146396 took 5s
+  phase                        escalated
+  delivered_epoch              
+  delivery_checked_epoch       1793146396
+  delivery_read_failed_epoch   
+  delivery_reconcile           resent
+  delivery_resend_epoch        1793146396
+  resolved_via                 
+  stored undelivered text      present
+  remote inbox unhandled       0
+  remote inbox handled         0
+  open decisions               pending-reply-7cff0a7e38fd74a1 
+  [tracker] tick at now=1793147091 took 2s
+  phase                        escalated
+  delivered_epoch              
+  delivery_checked_epoch       1793147091
+  delivery_read_failed_epoch   
+  delivery_reconcile           absent
+  delivery_resend_epoch        1793146396
+  resolved_via                 
+  stored undelivered text      absent
+  remote inbox unhandled       0
+  remote inbox handled         0
+  open decisions               pending-reply-7cff0a7e38fd74a1 
+  delivery-unknown escalation lines: 1
+
+=== S6: silent host (sshd accepts, remote never answers) -> tracker tick bounded by FM_PENDING_REPLY_INBOX_READ_BUDGET
+fm-lab-home: refusing '/tmp/fm-lab-ssh.R7GPOX/s6-rhome': a lab marker is only ever stamped on a fresh empty dir
+  [host] sshd stopped (port closed)
+  fm-send exit                 1
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab-ssh.R7GPOX/s6-phome
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the requested message WILL still be sent.
+  | ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ssh: connect to host 127.0.0.1 port 54585: Connection refused
+  | ssh: connect to host 127.0.0.1 port 54585: Connection refused
+  | error: steer to remote secondmate rsm is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:
+  | FM_HOME=/tmp/fm-lab-ssh.R7GPOX/s6-phome FM_PENDING_REPLY_EXISTING_CORR=09e44e7aa6ec4779 /home/konne/.no-mistakes/worktrees/df2f09488e0d/01M5ZWDJCTCFMYH4M8EBS97HS5/bin/fm-send.sh rsm please\ append\ one\ line\ \(s6\)
+  [host] sshd started pid=1496807
+  [tracker] tick at now=1793146396 took 4s
+  phase                        escalated
+  delivered_epoch              
+  delivery_checked_epoch       
+  delivery_read_failed_epoch   1793146396
+  delivery_reconcile           
+  delivery_resend_epoch        
+  resolved_via                 
+  stored undelivered text      present
+  remote inbox unhandled       0
+  remote inbox handled         0
+  open decisions               pending-reply-09e44e7aa6ec4779 

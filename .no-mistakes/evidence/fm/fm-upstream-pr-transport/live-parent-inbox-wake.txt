@@ -1,0 +1,13 @@
+--- run 1 (unhandled parent record 001.msg older than grace):
+check: parent instruction waiting: 1 unhandled in /tmp/fm-lab-ssh.R7GPOX/s2-rhome/state/parent-route/rsm.inbox, oldest 156s; read and act on each in numeric order, then mv each into its handled/
+fm-watch exit=0
+--- run 2 (same oldest record, already woken; 25s bound):
+check: rearm-resurface
+fm-watch exit=0
+--- marker: 001.msg
+--- wake queue entries:
+1793146617	1	check	parent-inbox-rsm-001	check: parent instruction waiting: 1 unhandled in /tmp/fm-lab-ssh.R7GPOX/s2-rhome/state/parent-route/rsm.inbox, oldest 156s; read and act on each in numeric ord
+--- run 3 (mate acknowledged the record -> handled/; 25s bound):
+check: rearm-resurface
+fm-watch exit=0
+--- marker after ack: <cleared>

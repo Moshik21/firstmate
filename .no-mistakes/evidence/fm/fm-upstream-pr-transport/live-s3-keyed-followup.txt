@@ -1,0 +1,9 @@
+=== S3 follow-up: after the operator's printed resend of the keyed answer
+  open decisions before tick: pending-reply-713021b320951ef2 
+  after one tracker pass: phase=awaiting_report reconcile= open=pending-reply-713021b320951ef2 
+  remote inbox records: 1 (no duplicate from the tracker)
+  after the mate's correlated report: phase=resolved resolved_via=status open=[]
+  status: blocked [key=pending-reply-713021b320951ef2] [at=1793146489]: pending-reply-delivery-unknown: task=rsm pending-reply-id=713021b320951ef2 request=the weekend, freeze Friday
+  status: resolved [key=pending-reply-713021b320951ef2] [at=1793146599]: pending-reply-resolved: task=rsm pending-reply-id=713021b320951ef2 via=status
+  status: needs-decision [key=upgrade-window]: tonight or the weekend
+  status: resolved [key=upgrade-window] [at=1793146503]: answered: the weekend, freeze Friday

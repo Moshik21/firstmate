@@ -1,0 +1,18 @@
+17:13:15 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh inbox-status rsm 4995d0be8fffdb16 
+17:13:19 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh send rsm [fm-from-firstmate]⁣corr=4995d0be8fff
+17:13:31 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh observe rsm 
+17:13:53 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh inbox-status rsm 4995d0be8fffdb16 
+17:13:55 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh inbox-status rsm 4995d0be8fffdb16 
+17:13:56 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh observe rsm 
+17:14:19 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh send rsm [fm-from-firstmate]⁣corr=ab320852f683
+  -> dropping ssh session after remote execution (rc=0)
+17:14:32 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh send rsm [fm-from-firstmate]⁣corr=ab320852f683
+  -> dropping ssh session after remote execution (rc=0)
+17:14:44 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh inbox-status rsm ab320852f683a382 
+17:14:51 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh send rsm [fm-from-firstmate]⁣corr=713021b32095
+17:15:06 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh inbox-status rsm 7cff0a7e38fd74a1 
+17:15:10 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh send rsm [fm-from-firstmate]⁣corr=7cff0a7e38fd
+17:15:11 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh inbox-status rsm 7cff0a7e38fd74a1 
+17:15:17 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh inbox-status rsm 09e44e7aa6ec4779 
+17:15:53 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh observe rsm 
+17:16:16 fm-remote-entrypoint.sh fm-remote-secondmate-control.sh observe rsm 
