@@ -1,0 +1,13 @@
+== opted-in lab home, non-codex ancestry: --capable
+rc=1
+== unconfigured home: --capable
+rc=1
+== unconfigured home: async Stop hook (must exit 0 at once, no state)
+rc=0
+== unconfigured: --guard with no tasks (falls through to turnend guard)
+rc=0
+== unknown arg
+error: unknown argument: --bogus
+rc=2
+== installed codex
+codex-cli 0.166.0

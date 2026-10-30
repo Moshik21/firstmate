@@ -1,0 +1,10 @@
+ok - an unconfigured home keeps the foreground checkpoint and every park hook is inert
+ok - the park is selected only for the verified codex-cli version
+ok - the single-flight claim admits one park, which delivers its wake through the native queue
+ok - a Stop that meets a delivered park's claim held 1s waits for its release and rearms
+ok - a Stop that meets a delivering park's claim held 4s waits for its release and rearms
+ok - a failed native queue delivery latches the session to foreground fallback
+ok - a latched fallback does not force a Stop turn when nothing needs supervision
+ok - a repeated arm failure latches the session to foreground fallback
+ok - the watcher exits when the park owner bound to it is gone
+ok - the model-free Codex host keeps one watcher across quiet boundaries with no model output and warm-compacts on the restarted clock
