@@ -2202,6 +2202,35 @@ test_local_unread_request_raises_no_unread_escalation() {
   pass "a local mate's unread request raises no tracker escalation and a handled one counts as a turn"
 }
 
+# The inbox read runs unlocked, so a reply handler can settle the record while
+# it is in flight. The older view must never replace the settled record.
+test_undelivered_reconcile_never_reopens_a_record_settled_during_the_read() {
+  local home state corr rec
+  home=$(setup_parent reconcile-race)
+  state="$home/state"
+  corr=$(FM_PENDING_REPLY_NOW=20000 fm_pending_reply_create "$home" "$state" t1 "raced request")
+  rec=$(fm_pending_reply_path "$state" "$corr")
+  fm_pending_reply_store_undelivered_text "$state" "$corr" "raced request"
+  fm_pending_reply_mark_delivery_unknown "$state" "$corr"
+  inbox_write "$state" t1 "[fm] corr=$corr raced request"
+
+  (
+    # The reply handler settles the record while the inbox read is in flight.
+    fm_pending_reply_inbox_status() {
+      fm_pending_reply_set "$rec" phase resolved
+      fm_pending_reply_inbox_status_report "$@"
+    }
+    FM_PENDING_REPLY_NOW=30000 fm_pending_reply_reconcile_undelivered "$state" "$corr"
+  ) && fail "reconciliation reported a change to a record settled during its read"
+  [ "$(phase_of "$state" "$corr")" = resolved ] \
+    || fail "a record settled during the inbox read was reopened as $(phase_of "$state" "$corr")"
+  [ -z "$(fm_pending_reply_get "$rec" delivery_checked_epoch)" ] \
+    || fail "reconciliation wrote undelivered fields onto a settled record"
+  [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
+    || fail "reconciliation marked a settled record delivered"
+  pass "reconciling an undelivered record never replaces one settled during the inbox read"
+}
+
 # --- run --------------------------------------------------------------------
 
 test_normal_correlated_reply_resolves_once
@@ -2255,5 +2284,6 @@ test_same_kind_escalation_reopens_after_operator_close
 test_summary_keeps_accents_and_caps_by_character
 test_inbox_status_reports_unhandled_handled_and_absent
 test_local_unread_request_raises_no_unread_escalation
+test_undelivered_reconcile_never_reopens_a_record_settled_during_the_read
 
 printf 'ok - all pending-reply tests passed\n'

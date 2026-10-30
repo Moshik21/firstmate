@@ -1648,18 +1648,23 @@ _fm_pending_reply_escalate_unread_locked() {  # <state-dir> <corr_id> <age-secs>
   fm_pending_reply_set "$rec" escalated_epoch "$now"
 }
 
+# True while the record is an undelivered one that reconciliation still owns.
+_fm_pending_reply_undelivered_open() {  # <record-path>
+  local rec=$1
+  [ -f "$rec" ] || return 1
+  [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] || return 1
+  case "$(fm_pending_reply_get "$rec" phase)" in delivery_unknown|escalated) ;; *) return 1 ;; esac
+  case "$(fm_pending_reply_get "$rec" delivery_reconcile)" in landed|absent) return 1 ;; esac
+}
+
 # Reconcile an undelivered record against the mate's inbox (see the header's
 # inbox reconciliation note). Returns 0 only after it changed the record.
 fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
-  local state=$1 corr=$2 rec phase task_id checked now recheck status corr_state text_path
-  local created max_age lock rc=0 parent_home text failed read_retry
+  local state=$1 corr=$2 rec task_id checked now recheck status corr_state text_path
+  local created max_age lock rc=0 parent_home text failed read_retry read_ok=1
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   rec=$(fm_pending_reply_path "$state" "$corr")
-  [ -f "$rec" ] || return 1
-  [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] || return 1
-  phase=$(fm_pending_reply_get "$rec" phase)
-  case "$phase" in delivery_unknown|escalated) ;; *) return 1 ;; esac
-  case "$(fm_pending_reply_get "$rec" delivery_reconcile)" in landed|absent) return 1 ;; esac
+  _fm_pending_reply_undelivered_open "$rec" || return 1
   text_path=$(fm_pending_reply_undelivered_text_path "$state" "$corr")
   [ -f "$text_path" ] || [ -n "$(fm_pending_reply_get "$rec" delivery_resend_epoch)" ] || return 1
   now=$(fm_pending_reply_now)
@@ -1674,26 +1679,39 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
   # retried after the short read-retry spacing rather than the full recheck
   # spacing - and not on every pass, which would dial a down or incapable host
   # at the watcher's poll rate.
-  if ! status=$(fm_pending_reply_inbox_status "$state" "$task_id" "$corr"); then
-    fm_pending_reply_set "$rec" delivery_read_failed_epoch "$now" || true
-    return 1
-  fi
-  [ -z "$failed" ] || fm_pending_reply_set "$rec" delivery_read_failed_epoch "" || true
-  fm_pending_reply_set "$rec" delivery_checked_epoch "$now" || return 1
-  corr_state=$(fm_pending_reply_inbox_field "$status" corr_state)
+  status=$(fm_pending_reply_inbox_status "$state" "$task_id" "$corr") || read_ok=0
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
   # Deliberately undirected: see fm_pending_reply_maybe_escalate.
   . "$_FM_PENDING_REPLY_LIB_DIR/fm-wake-lib.sh"
+  # The read ran unlocked, so the reply handler may have settled the record
+  # meanwhile: recheck it under the per-correlation lock before writing.
+  fm_lock_acquire_wait "$lock" || return 1
+  if ! _fm_pending_reply_undelivered_open "$rec"; then
+    fm_lock_release "$lock"
+    return 1
+  fi
+  if [ "$read_ok" -eq 0 ]; then
+    fm_pending_reply_set "$rec" delivery_read_failed_epoch "$now" || true
+    fm_lock_release "$lock"
+    return 1
+  fi
+  if [ -n "$failed" ]; then
+    fm_pending_reply_set "$rec" delivery_read_failed_epoch "" || true
+  fi
+  if ! fm_pending_reply_set "$rec" delivery_checked_epoch "$now"; then
+    fm_lock_release "$lock"
+    return 1
+  fi
+  corr_state=$(fm_pending_reply_inbox_field "$status" corr_state)
   case "$corr_state" in
     unhandled|handled)
-      fm_lock_acquire_wait "$lock" || return 1
       _fm_pending_reply_reconcile_landed_locked "$state" "$corr" "$now" || rc=$?
       fm_lock_release "$lock"
       return "$rc"
       ;;
     absent) ;;
-    *) return 1 ;;
+    *) fm_lock_release "$lock"; return 1 ;;
   esac
   created=$(fm_pending_reply_get "$rec" created_epoch)
   max_age=$(fm_pending_reply_tunable "${FM_PENDING_REPLY_RESEND_MAX_AGE_SECS:-}" "$FM_PENDING_REPLY_RESEND_MAX_AGE_DEFAULT")
@@ -1704,16 +1722,21 @@ fm_pending_reply_reconcile_undelivered() {  # <state-dir> <corr_id>
     # Never landed and no resend is due: stop checking. The open escalation
     # keeps the request in front of firstmate, whose manual resend command
     # still reuses this correlation.
-    fm_pending_reply_set "$rec" delivery_reconcile absent || return 1
-    rm -f "$text_path" 2>/dev/null || true
-    return 0
+    fm_pending_reply_set "$rec" delivery_reconcile absent || rc=$?
+    fm_lock_release "$lock"
+    [ "$rc" -ne 0 ] || rm -f "$text_path" 2>/dev/null || true
+    return "$rc"
   fi
   # Byte-exact: a bare $(cat) would drop the body's trailing newlines, and the
   # mate's inbox dedup compares the whole body.
-  text=$(cat "$text_path" 2>/dev/null && printf x) || return 1
+  if ! text=$(cat "$text_path" 2>/dev/null && printf x) \
+    || ! fm_pending_reply_set "$rec" delivery_resend_epoch "$now" \
+    || ! fm_pending_reply_set "$rec" delivery_reconcile resent; then
+    fm_lock_release "$lock"
+    return 1
+  fi
   text=${text%x}
-  fm_pending_reply_set "$rec" delivery_resend_epoch "$now" || return 1
-  fm_pending_reply_set "$rec" delivery_reconcile resent || return 1
+  fm_lock_release "$lock"
   # fm-send owns the outcome: success confirms delivery on the record, and an
   # unknown transport marks it delivery_unknown again for the next check. A
   # definite failure leaves it awaiting_report with no marker, which is
