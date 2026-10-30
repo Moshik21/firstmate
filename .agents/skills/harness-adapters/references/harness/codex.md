@@ -45,7 +45,7 @@ This is why `$no-mistakes` reaches a Codex worker instead of being consumed by t
 ## Primary integration
 
 The primary integration was verified on 2026-07-08 with codex-cli 0.142.1.
-The firstmate primary's `.codex/hooks.json` registers a Stop hook that pipes Codex's payload to `../../../bin/fm-turnend-guard.sh`.
+The firstmate primary's `.codex/hooks.json` registers a Stop hook that pipes Codex's payload to `../../../bin/fm-turnend-guard.sh`, through `../../../bin/fm-codex-stop-park.sh --guard` when that script is present.
 Codex Stop hooks preserve exit status 2 and stderr to block, and expose `stop_hook_active` for the same one-block loop safety used by the guard's default mode.
 
 The Stop payload includes `cwd`, but the tracked hook does not use it to choose the guard executable.
