@@ -47,7 +47,6 @@ ok - watcher: a positively dead pane is never typed into and surfaces exactly on
 ok - watcher: dead-pane recovery overrides stale busy state
 ok - inbox: the ring log records each ring decision and trims itself past 64 KiB
 ok - inbox: the ring log records a dead agent's refusal
-ok - watcher: a secondmate's own watcher wakes its session once per oldest unhandled parent record past the grace
-ok - watcher: a home without a secondmate identity ignores a parent-route inbox
-ok - inbox: a Herdr bare paste placeholder is submitted only after a recent ring of the record typed the doorbell
-rc=0
+touch: out of range or illegal time specification: YYYY-MM-DDThh:mm:SS[.frac][tz]
+not ok - an aged record must wake the mate once: 
+bash tests/$t.test.sh  46.06s user 71.76s system 41% cpu 4:46.30 total

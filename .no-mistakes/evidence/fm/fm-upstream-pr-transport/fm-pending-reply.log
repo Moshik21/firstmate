@@ -46,9 +46,8 @@ ok - remote parent-replies.status is not classified as wrong-home
 ok - local parent-replies.status remains wrong-home evidence
 ok - an escalated correlation stays retryable only while undelivered
 ok - a same-kind escalation after an operator close opens the decision again
-tests/fm-pending-reply.test.sh: line 2118: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8): No such file or directory
 ok - the summary keeps accented letters, drops control characters, and caps by character
 ok - inbox status: schema, unhandled count and age, and the unhandled/handled/absent correlation states
 ok - a local mate's unread request raises no tracker escalation and a handled one counts as a turn
 ok - all pending-reply tests passed
-rc=0
+bash tests/$t.test.sh  41.58s user 95.46s system 58% cpu 3:55.17 total
