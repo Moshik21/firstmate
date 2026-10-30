@@ -198,7 +198,8 @@ if [ "$MODE" = --guard ]; then
     fallback
     echo 'Codex watcher park failed to establish a live owner. Use the bounded foreground checkpoint protocol for this session; inspect state/.codex-park.json.' >&2
     printf '%s' "$PAYLOAD" | jq -e '.stop_hook_active == true' >/dev/null 2>&1 || exit 2
-  elif [ -n "$SESSION" ] && [ "$(cat "$FALLBACK" 2>/dev/null)" = "$SESSION" ]; then
+  elif [ -n "$SESSION" ] && [ "$(cat "$FALLBACK" 2>/dev/null)" = "$SESSION" ] \
+    && [ ! -e "$STATE/.afk" ] && fm_supervision_needed "$STATE"; then
     echo 'Codex watcher park is in foreground fallback after a failure; inspect state/.codex-park.json and resume bounded foreground checkpoints.' >&2
     printf '%s' "$PAYLOAD" | jq -e '.stop_hook_active == true' >/dev/null 2>&1 || exit 2
   fi

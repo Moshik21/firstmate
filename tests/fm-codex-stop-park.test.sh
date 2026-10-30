@@ -339,6 +339,19 @@ test_failed_queue_delivery_latches_fallback() {
   pass "a failed native queue delivery latches the session to foreground fallback"
 }
 
+test_latched_fallback_stays_quiet_without_supervision_need() {
+  local home out
+  home=$(make_home latched-idle opted-in)
+  printf '%s' "$SESSION_ID" > "$home/state/.codex-park-fallback"
+  rm -f "$home/state/fixture-task.meta"
+  out=$(under_codex "$home" "$REGISTER"'
+    printf "%s" "$PAYLOAD" | "$PARK" --guard; echo "guard=$?"
+  ' 2>&1)
+  assert_contains "$out" "guard=0" "a latched session with nothing to supervise must not block Stop: $out"
+  assert_equals ran "$(cat "$home/turnend-guard-ran" 2>/dev/null)" "the latched idle guard must defer to the turn-end guard"
+  pass "a latched fallback does not force a Stop turn when nothing needs supervision"
+}
+
 test_repeated_arm_failure_latches_fallback() {
   local home out
   home=$(make_home arm-failure opted-in)
@@ -454,6 +467,7 @@ test_single_flight_claim_admits_one_park
 test_stop_rearms_after_a_delivering_park_releases_its_claim delivered 1
 test_stop_rearms_after_a_delivering_park_releases_its_claim delivering 4
 test_failed_queue_delivery_latches_fallback
+test_latched_fallback_stays_quiet_without_supervision_need
 test_repeated_arm_failure_latches_fallback
 test_watcher_exits_when_its_park_owner_is_gone
 test_host_quiet_boundary_retains_the_watcher
