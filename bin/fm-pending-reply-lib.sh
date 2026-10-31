@@ -94,9 +94,10 @@
 # the parent's own state/<task_id>.inbox for a local mate, or the remote leg's
 # `fm-remote-secondmate-control.sh inbox-status` for a remote one
 # (fm_pending_reply_inbox_status_report owns that format). Three uses:
-#   - An idle observation with no busy ever seen is NOT a completed turn while
-#     the request's record (or its recovery record) is still unhandled: a mate
-#     that never woke is not a mate that took a fast turn.
+#   - An idle observation is NOT a completed turn while the request's record
+#     (or its recovery record) is still unhandled, whatever busy was seen: a
+#     mate that never read it is not a mate that took its turn, including one
+#     that was already busy on other work when the request landed.
 #   - A remote request still unhandled FM_PENDING_REPLY_UNREAD_SECS after
 #     delivery (or after the recovery send) escalates ONCE as
 #     pending-reply-unread, naming its age, the composer verdict, and the
@@ -1567,27 +1568,26 @@ fm_pending_reply_inbox_field() {  # <inbox-status> <key>
 }
 
 # 0 when an idle observation for <record-path> must not count as a completed
-# turn: no busy was ever seen for the current turn, no completion is recorded,
-# and the request is still unhandled in the mate's inbox. On that path a remote
-# record also gets its one unread escalation once it is old enough. An
-# unreadable inbox returns 1, so the idle counts exactly as it did before.
+# turn: no completion is recorded and the request is still unhandled in the
+# mate's inbox, whatever busy was seen (a request that lands on an already busy
+# mate stays unread through that turn). On that path a remote record also gets
+# its one unread escalation once it is old enough. An unreadable inbox returns
+# 1, so the idle counts exactly as it did before.
 fm_pending_reply_idle_unread() {  # <state-dir> <record-path>
-  local state=$1 rec=$2 phase seen completed start task_id corr status now age
+  local state=$1 rec=$2 phase completed start task_id corr status now age
   phase=$(fm_pending_reply_get "$rec" phase)
   case "$phase" in
     awaiting_report)
-      seen=$(fm_pending_reply_get "$rec" turn_seen_busy)
       completed=$(fm_pending_reply_get "$rec" request_turn_completed_epoch)
       start=$(fm_pending_reply_get "$rec" delivered_epoch)
       ;;
     recovery_sent)
-      seen=$(fm_pending_reply_get "$rec" recovery_turn_seen_busy)
       completed=$(fm_pending_reply_get "$rec" recovery_turn_completed_epoch)
       start=$(fm_pending_reply_get "$rec" recovery_sent_epoch)
       ;;
     *) return 1 ;;
   esac
-  [ "$seen" != 1 ] && [ -z "$completed" ] || return 1
+  [ -z "$completed" ] || return 1
   task_id=$(fm_pending_reply_get "$rec" task_id)
   corr=$(fm_pending_reply_get "$rec" corr_id)
   status=$(fm_pending_reply_inbox_status "$state" "$task_id" "$corr") || return 1

@@ -927,6 +927,37 @@ test_remote_unread_request_escalates_once() {
   pass "fm-pending-reply remote: an unread request escalates exactly once with age, count and remedy"
 }
 
+# Scenario 1, busy at delivery: a request that lands while the mate is already
+# working on other work stays unread through that whole turn, so the busy flag
+# set by that turn must not make the next idle count as the request's turn.
+test_remote_unread_request_delivered_to_a_busy_mate_still_escalates() {
+  local dir fb ssh_log home rhome corr rec status lines
+  dir="$TMP_ROOT/remote-unread-busy"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); ssh_log="$dir/ssh.log"; : > "$ssh_log"
+  rhome=$(setup_remote_secondmate_home remote-unread-busy)
+  home=$(setup_remote_parent_home remote-unread-busy "$rhome")
+  corr=$(send_remote_request "$fb" "$home" "$ssh_log" 10000 "please append one line")
+  rec=$(fm_pending_reply_path "$home/state" "$corr")
+  status="$home/state/rsm.status"
+
+  tracker_pass "$fb" "$home" "$ssh_log" 10010 FM_FAKE_SSH_OBSERVE=busy
+  [ "$(fm_pending_reply_get "$rec" turn_seen_busy)" = 1 ] \
+    || fail "the busy observation was not recorded: $(cat "$rec")"
+  tracker_pass "$fb" "$home" "$ssh_log" 10400 FM_FAKE_SSH_OBSERVE=busy
+
+  tracker_pass "$fb" "$home" "$ssh_log" 10500 FM_FAKE_SSH_OBSERVE=idle
+  [ -z "$(fm_pending_reply_get "$rec" request_turn_completed_epoch)" ] \
+    || fail "an idle after a busy turn must not complete a request still unhandled in the inbox: $(cat "$rec")"
+  lines=$(grep -c 'pending-reply-unread' "$status" || true)
+  [ "$lines" = 1 ] || fail "expected one pending-reply-unread escalation past the bound, got $lines: $(cat "$status" 2>/dev/null)"
+
+  mv "$rhome/state/parent-route/rsm.inbox"/*.msg "$rhome/state/parent-route/rsm.inbox/handled/"
+  tracker_pass "$fb" "$home" "$ssh_log" 10600 FM_FAKE_SSH_OBSERVE=idle
+  [ -n "$(fm_pending_reply_get "$rec" request_turn_completed_epoch)" ] \
+    || fail "once the request is handled an idle mate is a completed turn: $(cat "$rec")"
+  pass "fm-pending-reply remote: a request delivered to a busy mate that stays unread still escalates"
+}
+
 # Scenario 1, other half: once the mate has handled the request the same idle
 # observation is an ordinary completed turn.
 test_remote_handled_request_idle_counts_as_a_completed_turn() {
@@ -1506,6 +1537,7 @@ test_local_pending_reports_delivered_unconfirmed
 test_local_pending_does_not_close_resolve_key
 test_local_secondmate_pending_keeps_expectation_armed
 test_remote_unread_request_escalates_once
+test_remote_unread_request_delivered_to_a_busy_mate_still_escalates
 test_remote_handled_request_idle_counts_as_a_completed_turn
 test_remote_unreadable_inbox_leaves_the_idle_counting_as_before
 test_remote_lost_reply_reconciles_as_landed
