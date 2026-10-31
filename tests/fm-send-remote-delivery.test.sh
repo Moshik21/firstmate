@@ -1231,7 +1231,7 @@ test_remote_failed_resend_is_never_repeated() {
   rec=$(fm_pending_reply_path "$home/state" "$corr")
 
   # The inbox can be read but the send leg is lost: the one resend is spent.
-  tracker_pass "$fb" "$home" "$ssh_log" 17001 FM_FAKE_SSH_FAIL_SUBCMD=send
+  tracker_pass "$fb" "$home" "$ssh_log" 17001 FM_FAKE_SSH_FAIL_SUBCMD=send-stdin
   [ "$(fm_pending_reply_get "$rec" delivery_resend_epoch)" = 17001 ] \
     || fail "the failed resend must still count as the one resend: $(cat "$rec")"
   [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
@@ -1265,7 +1265,7 @@ test_remote_definitely_failed_resend_stays_tracked_and_escalates() {
 
   # The first check reads the inbox, finds nothing, and the one resend is
   # refused by the remote leg with a definite error.
-  tracker_pass "$fb" "$home" "$ssh_log" 18001 FM_FAKE_SSH_FAIL_SUBCMD=send FM_FAKE_SSH_FAIL_SUBCMD_RC=1
+  tracker_pass "$fb" "$home" "$ssh_log" 18001 FM_FAKE_SSH_FAIL_SUBCMD=send-stdin FM_FAKE_SSH_FAIL_SUBCMD_RC=1
   [ "$(fm_pending_reply_get "$rec" delivery_resend_epoch)" = 18001 ] \
     || fail "the refused resend must still count as the one resend: $(cat "$rec")"
   [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
