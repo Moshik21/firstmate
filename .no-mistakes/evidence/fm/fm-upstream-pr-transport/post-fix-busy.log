@@ -1,0 +1,4 @@
+ok - fm-pending-reply remote: an unread request escalates exactly once with age, count and remedy
+ok - fm-pending-reply remote: a request delivered to a busy mate that stays unread still escalates
+all fm-send-remote-delivery tests passed
+exit=0

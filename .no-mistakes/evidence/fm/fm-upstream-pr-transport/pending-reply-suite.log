@@ -47,5 +47,8 @@ ok - local parent-replies.status remains wrong-home evidence
 ok - an escalated correlation stays retryable only while undelivered
 ok - a same-kind escalation after an operator close opens the decision again
 ok - the summary keeps accented letters, drops control characters, and caps by character
+ok - inbox status: schema, unhandled count and age, and the unhandled/handled/absent correlation states
+ok - a local mate's unread request raises no tracker escalation and a handled one counts as a turn
+ok - reconciling an undelivered record never replaces one settled during the inbox read
 ok - all pending-reply tests passed
-bash tests/fm-pending-reply.test.sh  34.53s user 73.76s system 15% cpu 11:42.92 total
+exit=0
