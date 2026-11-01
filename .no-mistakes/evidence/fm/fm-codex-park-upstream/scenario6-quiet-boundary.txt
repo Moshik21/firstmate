@@ -1,0 +1,21 @@
+-- 13:22:11 calls=1 park=37558 outcome=waiting
+37558 17198 bash fm-codex-stop-park.sh
+38850 37558 perl -MPOSIX=WNOHANG,setpgid
+38884 38850 bash fm-supervision-host.sh
+40177 39900 bash fm-watch.sh
+-- 13:22:41 calls=1 park=37558 outcome=waiting
+37558 17198 bash fm-codex-stop-park.sh
+38850 37558 perl -MPOSIX=WNOHANG,setpgid
+38884 38850 bash fm-supervision-host.sh
+40177 39900 bash fm-watch.sh
+-- 13:23:11 calls=1 park=37558 outcome=waiting
+37558 17198 bash fm-codex-stop-park.sh
+38850 37558 perl -MPOSIX=WNOHANG,setpgid
+38884 38850 bash fm-supervision-host.sh
+40177 39900 bash fm-watch.sh
+
+1793564495	start	gen=host-38884-1793564495	primary=codex
+1793564515	quiet-boundary\tafter 20s; watcher retained
+1793564535	quiet-boundary\tafter 20s; watcher retained
+1793564555	quiet-boundary\tafter 20s; watcher retained
+1793564575	quiet-boundary\tafter 20s; watcher retained

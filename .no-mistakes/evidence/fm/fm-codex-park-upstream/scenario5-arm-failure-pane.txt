@@ -1,0 +1,30 @@
+  └ {
+      "session": "01a198c8-b1e5-7dd2-be86-d41c72b84c56",
+      "identity": "Sun Nov  1 20:24:32 2026     bash /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/
+    +6 lines (⌃t to view transcript)
+
+• Captain, the queue is empty and the park record confirms failure. The automatic retry is exhausted; this session uses
+  bounded foreground checkpoints when supervision is required. No fleet work is active.
+
+• Blocked by hook
+  └ Codex watcher park is in foreground fallback after a failure; inspect state/.codex-park.json and resume bounded
+  foreground checkpoints.
+
+• Captain, I’ll check the park record and run another foreground checkpoint.
+
+• Ran bin/fm-wake-drain.sh
+  └ WARNING: watcher still down (same stale episode; last beat: 162s ago, grace 300s) - full banner already printed
+    this episode.
+
+• Ran cat "$FM_HOME/state/.codex-park.json"; sed -n '1,100p' bin/fm-watch-checkpoint.sh
+  └ {
+      "session": "01a198c8-b1e5-7dd2-be86-d41c72b84c56",
+      "identity": "Sun Nov  1 20:24:32 2026     bash /private/var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/
+    +106 lines (⌃t to view transcript)
+
+• Working (15s • esc to interrupt)
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol low · /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-code.ws3vYT/fm · R…  ⚠ 2 warnings · f2 to view

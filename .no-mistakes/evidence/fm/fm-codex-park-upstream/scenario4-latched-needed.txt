@@ -1,0 +1,22 @@
+• Explored
+  └ Search checkpoint|bounded|fm-watch.sh in supervision-protocols
+
+• Ran cat docs/supervision-protocols/codex-checkpoint.md; bin/fm-wake-drain.sh
+  └ Mode: Codex foreground checkpoint.
+
+    When this session owns supervision and away mode is not active:
+    +23 lines (⌃t to view transcript)
+
+• Ran bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 34229.1793564182.p74heH
+  └ (no output)
+
+• Captain, the park record confirms queue delivery failed. I’ve acknowledged the recovered lab wake and am starting the
+  foreground checkpoint fallback.
+
+• Waiting for background terminal (35s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to cl…
+  └ bin/fm-watch-checkpoint.sh --seconds 60
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol low · /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-code.ws3vYT/fm · R…  ⚠ 2 warnings · f2 to view

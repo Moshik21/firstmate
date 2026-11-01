@@ -1,0 +1,45 @@
+
+⚠ Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown.
+
+• READY
+
+  Worked for 8s • 1:12 PM
+
+
+› Firstmate watcher wake: check: /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.DBrjXu/state/
+  labwake.check.sh: wake-from-lab-check-1
+  Run bin/fm-wake-drain.sh first. Handle every presented wake, open decision and unread status, then run its exact
+  WAKE_ACK_REQUIRED command. The next Stop re-arms automatically; do not run a foreground checkpoint.
+
+
+• Captain, I’ll drain the wake queue and handle the pending events before acknowledging them.
+
+• Ran bin/fm-wake-drain.sh
+  └ 1793564005    1    check    /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.DBrjXu/state/labwake.check.sh
+    check: /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T//fm-lab.DBrjXu/state/labwake.check.sh:
+    wake-from-lab-check-1
+    +2 lines (⌃t to view transcript)
+
+• Ran cat .agents/skills/session-start-recovery/SKILL.md .agents/skills/operational-home-layout/SKILL.md
+  └ ---
+    name: session-start-recovery
+    description: Load when the session-start digest reports unfinished checks, actionable diagnostics, recovery inputs,
+    +207 lines (⌃t to view transcript)
+
+• Captain, I’m applying the session recovery and operational layout skills. The drain presented one lab check and no
+  open decisions or unread status.
+
+• Explored
+  └ Read labwake.check.sh
+
+• Ran bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 52707.1793564005.9bewQm
+  └ (no output)
+
+• Captain, handled and acknowledged the lab wake. No open decisions or unread status were presented.
+
+  Worked for 14s • 1:13 PM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol low · /var/folders/zg/kfkfp61x11v1d1tn83t6r5x40000gn/T/fm-code.ws3vYT/fm · R…  ⚠ 2 warnings · f2 to view
