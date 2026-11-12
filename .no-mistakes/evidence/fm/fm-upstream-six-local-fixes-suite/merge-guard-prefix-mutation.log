@@ -1,0 +1,5 @@
+ok - fm-pr-merge --allow-missing is single use, attended-only, and GitHub-only like --allow-red
+ok - fm-pr-merge refuses a no-required-checks base that is behind, stale, failing, unrecorded, or unreadable
+ok - fm-pr-merge accepts suite=none with a reason and reports it as the worker's attestation
+not ok - unchecked-override-away-after-view: late away publication must refuse the waiver: expected exit 2, got 0
+not ok - unchecked-torn-record: the merge must be refused: expected exit 1, got 0

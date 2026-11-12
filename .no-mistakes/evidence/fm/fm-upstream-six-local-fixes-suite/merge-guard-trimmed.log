@@ -1,0 +1,6 @@
+ok - fm-pr-merge --allow-missing is single use, attended-only, and GitHub-only like --allow-red
+ok - fm-pr-merge refuses a no-required-checks base that is behind, stale, failing, unrecorded, or unreadable
+ok - fm-pr-merge accepts suite=none with a reason and reports it as the worker's attestation
+ok - fm-pr-merge --attended-override waives the no-required-checks conditions only while attended
+ok - fm-pr-merge parses one copy of a suite record that is rewritten while it is read
+bash tests/zz-trim-merge.test.sh  14.17s user 17.09s system 81% cpu 38.375 total
