@@ -1,4 +1,22 @@
-FM_TEST_BEGIN 2026-10-20T23:08:36Z tests/fm-pr-merge.test.sh family=pr-forge expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-12T06:01:28Z tests/fm-pr-merge.test.sh family=pr-forge expected_gate_skip=none
+observation: visibility=updated blocker=draft waiting=pending preflight_reads=2 retry_advice=false
+observation: visibility=updated blocker=draft waiting=missing preflight_reads=2 retry_advice=false
+observation: visibility=updated blocker=closed waiting=pending preflight_reads=2 retry_advice=false
+observation: visibility=updated blocker=closed waiting=missing preflight_reads=2 retry_advice=false
+observation: visibility=updated blocker=conflict waiting=pending preflight_reads=2 retry_advice=false
+observation: visibility=updated blocker=conflict waiting=missing preflight_reads=2 retry_advice=false
+observation: visibility=updated blocker=required-source waiting=pending preflight_reads=2 retry_advice=false
+observation: visibility=updated blocker=required-source waiting=missing preflight_reads=2 retry_advice=false
+observation: visibility=delayed blocker=draft waiting=pending preflight_reads=2 retry_advice=false
+observation: visibility=delayed blocker=draft waiting=missing preflight_reads=2 retry_advice=false
+observation: visibility=delayed blocker=closed waiting=pending preflight_reads=2 retry_advice=false
+observation: visibility=delayed blocker=closed waiting=missing preflight_reads=2 retry_advice=false
+observation: visibility=delayed blocker=conflict waiting=pending preflight_reads=2 retry_advice=false
+observation: visibility=delayed blocker=conflict waiting=missing preflight_reads=2 retry_advice=false
+observation: visibility=delayed blocker=required-source waiting=pending preflight_reads=2 retry_advice=false
+observation: visibility=delayed blocker=required-source waiting=missing preflight_reads=2 retry_advice=false
+ok - fm-pr-merge immediately refuses draft, closed, conflicting, or unreadable updated heads despite pending or missing checks
+ok - fm-pr-merge refuses a concurrent source-head change before updating, with or without --expected-head
 ok - fm-pr-merge reports exact queue retry flags after a zero-exit false success
 ok - fm-pr-merge omits merge-queue retry guidance for a closed GitHub PR
 ok - fm-pr-merge aggregates agreeing merge-queue rules
@@ -35,6 +53,7 @@ ok - fm-pr-merge explains how to retry with the required GitHub merge queue meth
 ok - fm-pr-merge refuses branch deletion unless --attended-override is passed
 ok - fm-pr-merge refuses before merging when task meta is missing
 ok - fm-pr-merge refuses malformed PR URLs before calling gh-axi
+ok - fm-pr-merge --help and -h print the header usage and exit 0
 ok - fm-pr-merge refuses unsafe PR URL segments before recording state
 ok - fm-pr-merge refuses repo override args before recording state
 ok - fm-pr-merge refuses a bundled short-option repo override and refuses -d unless attended
@@ -84,6 +103,10 @@ ok - fm-pr-merge refuses when its user backend configuration cannot be read
 ok - fm-pr-merge refuses when its user backend configuration directory cannot be traversed
 ok - fm-pr-merge proceeds once when its user configuration directory and backlog are genuinely absent
 ok - fm-pr-merge honors a backend override over an unreadable user configuration
+ok - fm-pr-merge updates behind branches only with explicit opt-in after all guards pass
+ok - fm-pr-merge retains --expected-head before and after a consented behind-branch update
+ok - fm-pr-merge refuses failed updated checks immediately while other checks are pending
+ok - fm-pr-merge updates a green behind branch and merges only after the new head is green
 ok - fm-pr-merge refuses red GitHub checks and waives only a named --allow-red check
 ok - fm-pr-merge refuses a draft pull request and one with no boolean draft state
 ok - fm-pr-merge merges when a failed check run was replaced by a passing re-run
@@ -125,7 +148,14 @@ ok - fm-pr-merge refuses --allow-red on Forgejo
 ok - fm-pr-merge refuses --allow-missing on Forgejo
 ok - fm-pr-merge --allow-no-pipeline waives only a null GitLab head pipeline and keeps every other condition
 ok - fm-pr-merge --allow-no-pipeline is attended-only, takes no value, and applies only to GitLab
-FM_TEST_END 2026-10-20T23:22:33Z tests/fm-pr-merge.test.sh exit=0 duration_ms=836343 gate_skip=false
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=836685
-FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=836343 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-pr-merge.test.sh duration_ms=836343
+ok - fm-pr-merge sends a matching --expected-head to each forge
+ok - fm-pr-merge refuses before any merge write when the live head differs from --expected-head
+ok - fm-pr-merge binds the forge write to the supplied head after that head moves
+ok - fm-pr-merge does not replace --expected-head when a later preflight reads a new head
+ok - fm-pr-merge refuses a malformed, abbreviated, missing, or conflicting --expected-head before any effect
+ok - fm-pr-merge keeps draft, hold, review, check, authority, and identity refusals when --expected-head matches
+FM_TEST_END 2026-11-12T06:24:28Z tests/fm-pr-merge.test.sh exit=0 duration_ms=1380434 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1380612
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=1380434 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-pr-merge.test.sh duration_ms=1380434
+EXIT=0

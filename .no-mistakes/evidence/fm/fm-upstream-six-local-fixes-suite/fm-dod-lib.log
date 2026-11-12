@@ -1,8 +1,16 @@
-FM_TEST_BEGIN 2026-10-20T23:08:36Z tests/fm-dod-lib.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-11-12T05:22:30Z tests/fm-dod-lib.test.sh family=pure-contract-unit expected_gate_skip=none
 ok - scout done: is not gated
 ok - unpushed ship done: is refused
 ok - no-mistakes pre-validation done: is not gated
 ok - named head on a remote-tracking ref is accepted
+ok - named head only on the no-mistakes gate mirror is refused, even after a refresh; on origin it is accepted
+ok - head origin holds through the gate clone is accepted after a refresh, and later reads see it
+ok - a project clone with its own git directory is refreshed too, and its origin's head is accepted
+ok - past the refresh deadline nothing is fetched and the refusal says it used the last-known refs
+ok - a failed refresh still refuses and says the verdict used the last-known refs
+ok - a remote that hangs and sorts before origin cannot take origin's refresh; origin's head is accepted and the hanging remote is named
+ok - a hanging remote in a standalone copy cannot take the project clone's refresh; its origin's head is accepted and failed remotes name their repository
+ok - local-only named branch stays reachable when the gate mirror also holds it
 ok - a moved remote branch that lacks the named head is refused
 ok - a 40-hex token in the note is not the named head
 ok - a recorded merged PR satisfies the gate after prune
@@ -27,7 +35,8 @@ ok - external review done: accepted on a canonical URL alone without a backup; P
 ok - external review done with a backup: refused until HEAD is under refs/remotes/backup/backup/, then accepted
 ok - worker role names the skill and its fallback skill file
 all fm-dod-lib tests passed
-FM_TEST_END 2026-10-20T23:09:18Z tests/fm-dod-lib.test.sh exit=0 duration_ms=41517 gate_skip=false
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=42017
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=41517 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-dod-lib.test.sh duration_ms=41517
+FM_TEST_END 2026-11-12T05:22:53Z tests/fm-dod-lib.test.sh exit=0 duration_ms=23261 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=23430
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=23261 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-dod-lib.test.sh duration_ms=23261
+exit=0
